@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using ImGuiNET;
@@ -293,7 +293,7 @@ public class KeyboardBinding
                   new KeyboardBinding(UserActions.InsertKeyframeWithIncrement, new KeyCombination(Key.C, shift: true)),
                   new KeyboardBinding(UserActions.ToggleAnimationPinning, new KeyCombination(Key.K, shift: true)),
 
-                  new KeyboardBinding(UserActions.TapBeatSync, new KeyCombination(Key.Z)),
+                  new KeyboardBinding(UserActions.TapBeatSync, new KeyCombination(Key.W)),
                   new KeyboardBinding(UserActions.TapBeatSyncMeasure, new KeyCombination(Key.X)),
                   
                   // Graph window

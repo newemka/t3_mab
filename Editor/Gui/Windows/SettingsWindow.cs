@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using ImGuiNET;
@@ -52,6 +52,10 @@ namespace T3.Editor.Gui.Windows
                         FormInputs.SetIndentToLeft();
                         FormInputs.AddSectionHeader("User Interface");
                         FormInputs.AddVerticalSpace();
+                        changed |= FormInputs.AddCheckBox("I have an AZERTY Keyboard",
+                                                          ref UserSettings.Config.GraphAndCameraInteraction,
+                                                          "ZQSD to move the camera A down E up.",
+                                                          UserSettings.Defaults.GraphAndCameraInteraction);
                         changed |= FormInputs.AddCheckBox("Suspend invalidation of inactive time clips",
                                                           ref ProjectSettings.Config.TimeClipSuspending,
                                                           "An experimental optimization that avoids dirty flag evaluation of graph behind inactive TimeClips. This is only relevant for very complex projects and multiple parts separated by timelines.",

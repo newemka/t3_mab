@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -48,8 +48,9 @@ namespace T3.Editor.Gui.UiHelpers
             public int WindowLayoutIndex = 0;
             public bool EnableIdleMotion = true;
             public bool SuspendRenderingWhenHidden = true;
-            
+
             // Interaction
+            public bool GraphAndCameraInteraction;
             public bool WarnBeforeLibEdit = true;
             public bool SmartGroupDragging = false;
             public bool ShowExplicitTextureFormatInOutputWindow = false;

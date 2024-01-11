@@ -378,36 +378,73 @@ namespace T3.Editor.Gui.Graph
                     
                     if (!io.KeyCtrl && !io.KeyShift && !io.KeyAlt && !editingSomething)
                     {
-                        if (ImGui.IsKeyDown((ImGuiKey)Key.W))
+                        if (UserSettings.Config.GraphAndCameraInteraction == true)
                         {
-                            _dampedScrollVelocity.Y -= InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).Y;
-                        }
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.Z))
+                            {
+                                _dampedScrollVelocity.Y -= InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).Y;
+                            }
 
-                        if (ImGui.IsKeyDown((ImGuiKey)Key.S))
-                        {
-                            _dampedScrollVelocity.Y += InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).Y;
-                        }
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.S))
+                            {
+                                _dampedScrollVelocity.Y += InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).Y;
+                            }
 
-                        if (ImGui.IsKeyDown((ImGuiKey)Key.A))
-                        {
-                            _dampedScrollVelocity.X -= InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).X;
-                        }
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.Q))
+                            {
+                                _dampedScrollVelocity.X -= InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).X;
+                            }
 
-                        if (ImGui.IsKeyDown((ImGuiKey)Key.D))
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.D))
+                            {
+                                _dampedScrollVelocity.X += InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).X;
+                            }
+
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.A))
+                            {
+                                var center = WindowPos + WindowSize / 2;
+                                ApplyZoomDelta(center, 1.05f);
+                            }
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.E))
+                            {
+                                var center = WindowPos + WindowSize / 2;
+                                ApplyZoomDelta(center, 1 / 1.05f);
+                            }
+                        }
+                        else
                         {
-                            _dampedScrollVelocity.X += InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).X;
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.W))
+                            {
+                                _dampedScrollVelocity.Y -= InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).Y;
+                            }
+
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.S))
+                            {
+                                _dampedScrollVelocity.Y += InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).Y;
+                            }
+
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.A))
+                            {
+                                _dampedScrollVelocity.X -= InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).X;
+                            }
+
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.D))
+                            {
+                                _dampedScrollVelocity.X += InverseTransformDirection(Vector2.One * UserSettings.Config.KeyboardScrollAcceleration).X;
+                            }
+
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.Q))
+                            {
+                                var center = WindowPos + WindowSize / 2;
+                                ApplyZoomDelta(center, 1.05f);
+                            }
+                            if (ImGui.IsKeyDown((ImGuiKey)Key.E))
+                            {
+                                var center = WindowPos + WindowSize / 2;
+                                ApplyZoomDelta(center, 1 / 1.05f);
+                            }
                         }
                         
-                        if (ImGui.IsKeyDown((ImGuiKey)Key.Q))
-                        {
-                            var center = WindowPos + WindowSize / 2;
-                            ApplyZoomDelta( center, 1.05f);
-                        }
-                        if (ImGui.IsKeyDown((ImGuiKey)Key.E))
-                        {
-                            var center = WindowPos + WindowSize / 2;
-                            ApplyZoomDelta( center, 1/1.05f);
-                        }
                     }
                 }
 
