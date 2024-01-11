@@ -53,6 +53,10 @@ namespace T3.Editor.Gui.Windows
 
                         FormInputs.AddSectionHeader("User Interface");
                         FormInputs.AddVerticalSpace();
+                        changed |= FormInputs.AddCheckBox("I have an AZERTY Keyboard",
+                                                          ref UserSettings.Config.GraphAndCameraInteraction,
+                                                          "ZQSD to move the camera A down E up.",
+                                                          UserSettings.Defaults.GraphAndCameraInteraction);
                         changed |= FormInputs.AddCheckBox("Editing values with mousewheel needs CTRL key",
                                                           ref UserSettings.Config.MouseWheelEditsNeedCtrlKey,
                                                           "In parameter window you can edit numeric values by using the mouse wheel. This setting will prevent accidental modifications while scrolling because by using ctrl key for activation.",
