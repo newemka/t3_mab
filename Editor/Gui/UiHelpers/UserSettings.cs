@@ -59,6 +59,7 @@ namespace T3.Editor.Gui.UiHelpers
             public float SnapStrength = 5;
             public ValueEditMethods ValueEditMethod;
             public float ScrollSmoothing = 0.1f;
+            public bool PerformanceGraph = true;
 
             public float ClickThreshold = 5; // Increase for high-res display and pen tablets
             public bool AdjustCameraSpeedWithMouseWheel = false;

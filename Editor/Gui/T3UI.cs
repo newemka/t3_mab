@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -368,8 +368,12 @@ public class T3Ui
                 ImGui.TextUnformatted(Program.GetReleaseVersion());
                 ImGui.PopStyleColor();
             }
-            
-            T3Metrics.DrawRenderPerformanceGraph();
+
+            if (UserSettings.Config.PerformanceGraph)
+            {
+                T3Metrics.DrawRenderPerformanceGraph();
+            }
+                
             
             Program.StatusErrorLine.Draw();
 

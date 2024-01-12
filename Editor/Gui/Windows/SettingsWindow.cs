@@ -76,6 +76,10 @@ namespace T3.Editor.Gui.Windows
                                                           ref UserSettings.Config.SmartGroupDragging,
                                                           "An experimental features that will drag neighbouring snapped operators",
                                                           UserSettings.Defaults.SmartGroupDragging);
+                        changed |= FormInputs.AddCheckBox("Performance graph",
+                                                         ref UserSettings.Config.PerformanceGraph,
+                                                         "Just in case this is driving you crazy",
+                                                         UserSettings.Defaults.PerformanceGraph);
 
                         FormInputs.AddVerticalSpace();
                         FormInputs.SetIndentToParameters();
