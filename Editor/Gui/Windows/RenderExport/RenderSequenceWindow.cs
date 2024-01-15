@@ -15,10 +15,9 @@ public class RenderSequenceWindow : RenderHelperWindow
     public RenderSequenceWindow()
     {
         Config.Title = "Render Sequence";
-        _lastHelpString = "Hint: Use a [RenderTarget] with format R8G8B8A8_UNorm for faster exports.";
+        _lastHelpString = PreferredInputFormatHint;
     }
-
-
+    
     protected override void DrawContent()
     {
         DrawTimeSetup();
@@ -31,11 +30,11 @@ public class RenderSequenceWindow : RenderHelperWindow
         ImGui.Separator();
 
         var mainTexture = OutputWindow.GetPrimaryOutputWindow()?.GetCurrentTexture();
-        if (mainTexture == null)
+        if (FindIssueWithTexture(mainTexture, ScreenshotWriter.SupportedInputFormats, out var warning))
         {
-            CustomComponents.HelpText("You have selected an operator that does not render. " +
-                                      "Hint: Use a [RenderTarget] with format R8G8B8A8_UNorm for fast exports.");
+            CustomComponents.HelpText(warning);
             return;
+            
         }
 
         if (!IsExporting)
@@ -44,6 +43,8 @@ public class RenderSequenceWindow : RenderHelperWindow
             {
                 if (ValidateOrCreateTargetFolder(_targetFolder))
                 {
+                    _previousPlaybackSpeed = Playback.Current.PlaybackSpeed;
+                    Playback.Current.PlaybackSpeed = 1;
                     _isExporting = true;
                     _exportStartedTime = Playback.RunTimeInSecs;
                     FrameIndex = 0;
@@ -80,6 +81,7 @@ public class RenderSequenceWindow : RenderHelperWindow
             if (!IsExporting &&  ScreenshotWriter.SavingComplete)
             {
                 ScreenshotWriter.Dispose();
+                Playback.Current.PlaybackSpeed = _previousPlaybackSpeed;
             }
         }
 
@@ -127,4 +129,5 @@ public class RenderSequenceWindow : RenderHelperWindow
 
     private static ScreenshotWriter.FileFormats _fileFormat;
     private static string _lastHelpString = string.Empty;
+    private double _previousPlaybackSpeed;
 }
