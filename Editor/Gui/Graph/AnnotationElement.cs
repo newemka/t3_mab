@@ -66,7 +66,7 @@ namespace T3.Editor.Gui.Graph
             const float backgroundAlpha = 0.2f;
             const float headerHoverAlpha = 0.3f;
 
-            drawList.AddRectFilled(_screenArea.Min, _screenArea.Max, UiColors.BackgroundFull.Fade(backgroundAlpha));
+            drawList.AddRectFilled(_screenArea.Min, _screenArea.Max, annotation.Color.Fade(backgroundAlpha)); // now the annotation background use its color
 
             // Interaction
             ImGui.SetCursorScreenPos(clickableArea.Min);
