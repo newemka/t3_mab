@@ -40,7 +40,7 @@ namespace T3.Core.Utils
             return (float)(1.0 - ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0);
         }
 
-        public static float  ApplyGainBias(this float x, float t, float s)
+        public static float  ApplyBiasAndGain(this float x, float s, float t)
         {
             const float eps = 0.0001f;
             const float r = 200;
@@ -107,6 +107,17 @@ namespace T3.Core.Utils
         public static float ToRadians(this float val)
         {
             return val * MathF.PI / 180;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool _IsFinite(this float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }        
+        
+        public static bool _IsFinite(this Vector3 value)
+        {
+            return value.X._IsFinite() && value.Y._IsFinite() && value.Z._IsFinite();
         }        
         
         public static Vector2 Clamp(Vector2 v, Vector2 mn, Vector2 mx)

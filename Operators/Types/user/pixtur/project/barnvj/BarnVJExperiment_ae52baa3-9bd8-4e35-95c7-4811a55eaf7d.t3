@@ -595,17 +595,17 @@
       "SymbolId": "d392d4af-4c78-4f4a-bc3f-4c54c8c73538",
       "InputValues": [
         {
-          "Id": "57968725-0a45-44f9-a9a2-f74c10b728e8"/*BlurRadius*/,
+          "Id": "57968725-0a45-44f9-a9a2-f74c10b728e8"/*Radius*/,
           "Type": "System.Single",
           "Value": 1.17
         },
         {
-          "Id": "4927a3fc-87ff-44e7-88c0-499e3efcca55"/*GlowAmount*/,
+          "Id": "4927a3fc-87ff-44e7-88c0-499e3efcca55"/*Intensity*/,
           "Type": "System.Single",
           "Value": 0.62
         },
         {
-          "Id": "4c9b9135-f27b-414e-bed7-f9e5640dc526"/*Offset*/,
+          "Id": "4c9b9135-f27b-414e-bed7-f9e5640dc526"/*Threshold*/,
           "Type": "System.Single",
           "Value": -0.01999998
         }
@@ -4002,7 +4002,7 @@
       "SymbolId": "6415ed0e-3692-45e2-8e70-fe0cf4d29ebc",
       "InputValues": [
         {
-          "Id": "dd92fb0a-4b3e-4492-bf59-437d914a1ad3"/*Radius*/,
+          "Id": "dd92fb0a-4b3e-4492-bf59-437d914a1ad3"/*DistanceToTarget*/,
           "Type": "System.Single",
           "Value": 2.22
         },
@@ -4657,7 +4657,7 @@
       "SymbolId": "d392d4af-4c78-4f4a-bc3f-4c54c8c73538",
       "InputValues": [
         {
-          "Id": "57968725-0a45-44f9-a9a2-f74c10b728e8"/*BlurRadius*/,
+          "Id": "57968725-0a45-44f9-a9a2-f74c10b728e8"/*Radius*/,
           "Type": "System.Single",
           "Value": 8.4
         }
@@ -5213,7 +5213,7 @@
       "SymbolId": "d392d4af-4c78-4f4a-bc3f-4c54c8c73538",
       "InputValues": [
         {
-          "Id": "57968725-0a45-44f9-a9a2-f74c10b728e8"/*BlurRadius*/,
+          "Id": "57968725-0a45-44f9-a9a2-f74c10b728e8"/*Radius*/,
           "Type": "System.Single",
           "Value": 4.0
         }
@@ -5743,11 +5743,6 @@
           "Id": "eab31c38-0e6f-432a-9f15-04bfb0aae28c"/*Repeat*/,
           "Type": "System.Boolean",
           "Value": true
-        },
-        {
-          "Id": "945d14de-62aa-47cf-81e3-a91c52811d8e"/*Bias*/,
-          "Type": "System.Single",
-          "Value": 4.6
         }
       ],
       "Outputs": []
@@ -5897,12 +5892,7 @@
           }
         },
         {
-          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
-          "Type": "System.Single",
-          "Value": 0.0
-        },
-        {
-          "Id": "10d59d0f-a5a3-42e6-b874-345ab028978e"/*Size*/,
+          "Id": "10d59d0f-a5a3-42e6-b874-345ab028978e"/*Width*/,
           "Type": "System.Single",
           "Value": 0.18
         },
@@ -5915,6 +5905,11 @@
           "Id": "7f3fe86d-f259-458a-908a-0a71d39ca678"/*Repeat*/,
           "Type": "System.Boolean",
           "Value": true
+        },
+        {
+          "Id": "8169be8f-cb35-4900-b462-f2139b412d59"/*Rotation*/,
+          "Type": "System.Single",
+          "Value": 0.0
         }
       ],
       "Outputs": []
@@ -6149,12 +6144,12 @@
       "SymbolId": "d392d4af-4c78-4f4a-bc3f-4c54c8c73538",
       "InputValues": [
         {
-          "Id": "57968725-0a45-44f9-a9a2-f74c10b728e8"/*BlurRadius*/,
+          "Id": "57968725-0a45-44f9-a9a2-f74c10b728e8"/*Radius*/,
           "Type": "System.Single",
           "Value": 0.0
         },
         {
-          "Id": "4927a3fc-87ff-44e7-88c0-499e3efcca55"/*GlowAmount*/,
+          "Id": "4927a3fc-87ff-44e7-88c0-499e3efcca55"/*Intensity*/,
           "Type": "System.Single",
           "Value": 0.74
         },
@@ -6261,24 +6256,6 @@
           }
         },
         {
-          "Id": "92e7fb1f-73b0-4960-b359-ee0e45e59817"/*Size*/,
-          "Type": "System.Numerics.Vector2",
-          "Value": {
-            "X": 0.08,
-            "Y": -6.8
-          }
-        },
-        {
-          "Id": "4ac28e13-fac9-4f1a-9aa7-e564a0d57e93"/*Round*/,
-          "Type": "System.Single",
-          "Value": 0.04
-        },
-        {
-          "Id": "4d9bfddb-901e-4524-a99c-ba594d317e8a"/*Feather*/,
-          "Type": "System.Single",
-          "Value": 0.09
-        },
-        {
           "Id": "e7a99144-1f59-42ae-bdac-906ca1e54e0d"/*Sides*/,
           "Type": "System.Single",
           "Value": 4.0
@@ -6287,6 +6264,16 @@
           "Id": "c6c3d50e-9731-42cc-a0fc-ee8d15ac6cca"/*Radius*/,
           "Type": "System.Single",
           "Value": 0.38
+        },
+        {
+          "Id": "4d9bfddb-901e-4524-a99c-ba594d317e8a"/*Feather*/,
+          "Type": "System.Single",
+          "Value": 0.09
+        },
+        {
+          "Id": "4ac28e13-fac9-4f1a-9aa7-e564a0d57e93"/*Round*/,
+          "Type": "System.Single",
+          "Value": 0.04
         }
       ],
       "Outputs": []

@@ -45,8 +45,12 @@
       "DefaultValue": "MinMagMipLinear"
     },
     {
-      "Id": "d1db33ea-1739-4323-9105-7b236a0e240f"/*TextureWrap*/,
+      "Id": "d1db33ea-1739-4323-9105-7b236a0e240f"/*WrapMode*/,
       "DefaultValue": "Wrap"
+    },
+    {
+      "Id": "d7bd3003-8589-4537-92e8-e95c5eb2bfab"/*UseMaterialId*/,
+      "DefaultValue": ""
     }
   ],
   "Children": [
@@ -337,6 +341,12 @@
       "Id": "036bd517-a749-4fc7-bdf1-3845d2e51166"/*linearSampler*/,
       "SymbolId": "9515d59d-0bd5-406b-96da-6a5f60215700",
       "Name": "linearSampler",
+      "InputValues": [],
+      "Outputs": []
+    },
+    {
+      "Id": "a3909a56-9592-4218-8b62-28d6eff864fc"/*DrawInstancedIndirect*/,
+      "SymbolId": "c676b9c7-06d7-4ee0-8ffc-9bee96c5dc18",
       "InputValues": [],
       "Outputs": []
     }

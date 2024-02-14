@@ -180,7 +180,7 @@ internal class ParameterWindow : Window
             ImGui.PushStyleColor(ImGuiCol.Text, new Color(0.5f).Rgba);
             var namespaceForEdit = op.Symbol.Namespace ?? "";
 
-            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 29); // the question mark gets a better placement
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 29); // the question mark is now aligned to the right
             if (InputWithTypeAheadSearch.Draw("##namespace", ref namespaceForEdit,
                                               SymbolRegistry.Entries.Values.Select(i => i.Namespace).Distinct().OrderBy(i => i)))
             {
@@ -337,14 +337,14 @@ internal class ParameterWindow : Window
             var skipIfDefault = groupState == GroupState.InsideClosed;
             var editState = inputUi.DrawParameterEdit(inputSlot, compositionSymbolUi, symbolChildUi, hideNonEssentials: hideNonEssentials, skipIfDefault);
 
-            if ((editState & InputEditStateFlags.Started) != InputEditStateFlags.Nothing)
+            if (editState.HasFlag(InputEditStateFlags.Started) )
             {
                 _inputSlotForActiveCommand = inputSlot;
                 _inputValueCommandInFlight =
                     new ChangeInputValueCommand(instance.Parent.Symbol, instance.SymbolChildId, inputSlot.Input, inputSlot.Input.Value);
             }
 
-            if ((editState & InputEditStateFlags.Modified) != InputEditStateFlags.Nothing)
+            if (editState.HasFlag(InputEditStateFlags.Modified))
             {
                 if (_inputValueCommandInFlight == null || _inputSlotForActiveCommand != inputSlot)
                 {
@@ -357,7 +357,7 @@ internal class ParameterWindow : Window
                 inputSlot.DirtyFlag.Invalidate();
             }
 
-            if ((editState & InputEditStateFlags.Finished) != InputEditStateFlags.Nothing)
+            if (editState.HasFlag(InputEditStateFlags.Finished))
             {
                 if (_inputValueCommandInFlight != null && _inputSlotForActiveCommand == inputSlot)
                 {

@@ -7,23 +7,19 @@ using T3.Core.Logging;
 using T3.Core.Rendering.Material;
 using T3.Core.Resource;
 using T3.Core.Utils.Geometry;
-using Buffer = SharpDX.Direct3D11.Buffer;
 
 namespace T3.Core.DataTypes;
 
 /// <summary>
-/// Combines buffers required for mesh rendering
+/// Combines buffers required for mesh rendering. Eventually this will be an abstraction from
+/// format specific details, so it can be created from gltf, obj, fbx, etc.
 /// </summary>
-public class SceneSetup : IEditableInputType
+public class SceneSetup : IEditableInputType, IDisposable
 {
-    // private List<MeshBuffers> _meshBuffers;
-    // private Point[] Positions;
-    // private List<PbrMaterial> Materials;
-
+    // TODO: Implement UI and serialize 
     // private Dictionary<string, string> MaterialAssignments;
-
-    public List<SceneNode> Nodes = new List<SceneNode>();
-
+    
+    
     /// <summary>
     /// Recursive description of the loaded nodes...
     /// This can be translated into a list of draw dispatches.
@@ -31,19 +27,34 @@ public class SceneSetup : IEditableInputType
     /// <remarks>
     /// This closely follows the gltf format structure but should be
     /// agnostic to other multi-node formats like obj.</remarks>
+    public readonly List<SceneNode> RootNodes = new();
+    
     public class SceneNode
     {
         public string Name;
-        public List<SceneNode> ChildNodes = new();
+        public readonly List<SceneNode> ChildNodes = new();
         public Matrix4x4 CombinedTransform;
         public Transform Transform;
         public string MeshName;
+        public MeshBuffers MeshBuffers;
+        public SceneMaterial Material;
     }
 
+    /// <summary>
+    /// Holds information required for building a T3 PbrMaterial.
+    /// </summary>
+    public class SceneMaterial
+    {
+        public string Name;
+        public PbrMaterial.PbrParameters PbrParameters;
+        public PbrMaterial PbrMaterial;
+    }
+
+    // FIXME: This should probably be moved to somewhere in core -> Rendering
     public struct Transform
     {
         public Vector3 Translation;
-        public Vector3 RotationYawPitchRoll;
+        public Quaternion Rotation;
         public Vector3 Scale;
 
         public Matrix4x4 ToTransform()
@@ -53,9 +64,7 @@ public class SceneSetup : IEditableInputType
                                                            scalingRotation: Quaternion.Identity,
                                                            scaling: Scale,
                                                            rotationCenter: Vector3.Zero,
-                                                           rotation: Quaternion.CreateFromYawPitchRoll(RotationYawPitchRoll.Y,
-                                                                                                       RotationYawPitchRoll.X,
-                                                                                                       RotationYawPitchRoll.Z),
+                                                           rotation: Rotation,
                                                            translation: Translation);
         }
     }
@@ -65,7 +74,7 @@ public class SceneSetup : IEditableInputType
     /// <summary>
     /// Holds settings for a node inside the scene
     /// </summary>
-    public struct NodeSetting
+    public class NodeSetting
     {
         public int NodeHashId;
         public string PbrMaterialId;
@@ -80,25 +89,68 @@ public class SceneSetup : IEditableInputType
         }
     }
 
-    // private List<DrawBatch> _drawBatches;
-
-    // struct DrawBatch
-    // {
-    //     public PbrMaterial Material;
-    //     public MeshBuffers Mesh;
-    //     public int StartFaceIndex;
-    //     public int FaceCount;
-    //     public int[] PointIndices;
-    //     public Buffer PointIndexBuffer;
-    // }
-
+    
+        
+    #region dispatch preprocessing 
+    /// <summary>
+    /// Flattens the node structure
+    /// </summary>
+    public void GenerateSceneDrawDispatches()
+    {
+        Dispatches.Clear();
+        if (RootNodes == null || RootNodes.Count != 1)
+        {
+            Log.Warning("Gltf scene requires a single root node");
+            return;
+        }
+        
+        FlattenNodeTreeForDispatching(RootNodes[0]);
+    }
+    
+    private void FlattenNodeTreeForDispatching(SceneNode node)
+    {
+        if (node.MeshBuffers != null)
+        {
+            var vertexCount = node.MeshBuffers.IndicesBuffer.Srv.Description.Buffer.ElementCount *3;
+            var newDispatch = new SceneDrawDispatch
+                                  {
+                                      MeshBuffers = node.MeshBuffers,
+                                      VertexCount = vertexCount,
+                                      VertexStartIndex = 0,
+                                      Material = node.Material?.PbrMaterial,
+                                      CombinedTransform = node.CombinedTransform,
+                                  };
+            
+            Dispatches.Add(newDispatch);
+        }
+        
+        foreach (var childNode in node.ChildNodes)
+        {
+            FlattenNodeTreeForDispatching(childNode);
+        }
+    }
+    
+    /// <summary>
+    /// Flattened structure used by _DispatchSceneDraws to dispatch draw commands.
+    /// </summary>
+    public class SceneDrawDispatch
+    {
+        public MeshBuffers MeshBuffers;
+        public int VertexCount;
+        public int VertexStartIndex;
+        public PbrMaterial Material;
+        public Matrix4x4 CombinedTransform;
+    }
+    
+    public readonly List<SceneDrawDispatch> Dispatches = new();
+    #endregion
+    
     #region serialization
     public void Write(JsonTextWriter writer)
     {
         writer.WritePropertyName(nameof(SceneSetup));
         writer.WriteStartObject();
 
-        // writer.WriteObject("Interpolation", Interpolation);
         writer.WritePropertyName("NodeSettings");
         writer.WriteStartArray();
 
@@ -110,7 +162,6 @@ public class SceneSetup : IEditableInputType
                 {
                     writer.WriteStartObject();
                     writer.WriteValue(nameof(setting.NodeHashId), setting.NodeHashId);
-                    //writer.WriteObject(nameof(setting.Visibility), (int)setting.Visibility);
 
                     if (setting.Visibility != NodeSetting.NodeVisibilities.Default)
                         writer.WriteObject(nameof(setting.Visibility), setting.Visibility.ToString());
@@ -123,7 +174,7 @@ public class SceneSetup : IEditableInputType
         writer.WriteEndObject();
     }
 
-    public virtual void Read(JToken inputToken)
+    public void Read(JToken inputToken)
     {
         if (NodeSettings == null)
         {
@@ -172,4 +223,27 @@ public class SceneSetup : IEditableInputType
                    };
     }
     #endregion
+
+    public void Dispose() => Dispose(true);
+    
+    public void Dispose(bool isDisposing)
+    {
+        if (isDisposing)
+            return;
+        
+        foreach(var dispatch in Dispatches)
+        {
+            dispatch.MeshBuffers.IndicesBuffer.Dispose();
+            dispatch.MeshBuffers.VertexBuffer.Dispose();
+
+            if (dispatch.Material != null)
+            {
+                dispatch.Material.Dispose();
+                dispatch.Material = null;
+            }
+        }
+
+        
+        
+    }
 }
