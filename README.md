@@ -1,5 +1,7 @@
 # Tooll 3 - A realtime animation toolkit
 
+[![Download](https://img.shields.io/badge/Download_Tooll3_v3.9.1-FF3A9E?style=for-the-badge&logoColor=white&logo=DocuSign)](https://github.com/tooll3/t3/releases/download/v3.9.1/Tooll-v3.9.1.zip)
+
 [![Discord](https://img.shields.io/discord/823853172619083816.svg?style=for-the-badge)](https://discord.gg/YmSyQdeH3S)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](https://github.com/alelievr/Mixture/blob/master/LICENSE)
 
@@ -26,6 +28,15 @@ Please follow the [installation guide](https://github.com/tooll3/t3/wiki/Install
 To get started read the [documentation](https://github.com/tooll3/t3/wiki/user-interface) or watch [tutorial videos](https://www.youtube.com/watch?v=eH2E02U6P5Q&list=PLj-rnPROvbn3LigXGRSDvmLtgTwmNHcQs&index=4)
 
 If you have questions or feedback, please join us on discord: https://discord.gg/YmSyQdeH3S 
+
+<!---------------------------------[ Buttons ]--------------------------------->
+
+[![Download](https://img.shields.io/badge/Download_Tooll3_v3.9.1-FF3A9E?style=for-the-badge&logoColor=white&logo=DocuSign)](https://github.com/tooll3/t3/releases/download/v3.9.1/Tooll-v3.9.1.zip)
+
+![GitHub Downloads (specific asset, specific tag)](https://img.shields.io/github/downloads/tooll3/t3/v3.9.1/Tooll-v3.9.1.zip)
+
+
+
 
 
 
