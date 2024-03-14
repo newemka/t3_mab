@@ -6,13 +6,13 @@ using T3.Core.Operator.Slots;
 
 namespace T3.Operators.Types.Id_8360f1b5_72cc_4bea_8311_537fd7d7b263
 {
-    public class DeformMesh3 : Instance<DeformMesh3>
+    public class TwistMesh : Instance<TwistMesh>
 ,ITransformable
     {
         [Output(Guid = "c65bdd7f-21da-463b-9881-ee992286e303")]
         public readonly TransformCallbackSlot<T3.Core.DataTypes.MeshBuffers> Result = new();
         
-        public DeformMesh3()
+        public TwistMesh()
         {
             Result.TransformableOp = this;
         }        

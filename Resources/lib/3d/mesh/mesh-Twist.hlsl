@@ -28,8 +28,8 @@ void main(uint3 i : SV_DispatchThreadID)
     float3 pos = SourceVerts[i.x].Position;
     float3 translation = float3(TransformMatrix[3].x, TransformMatrix[3].y, TransformMatrix[3].z); // Extracting translation component from TransformMatrix
 
-    // Subtract deformation origin from vertex position
-    pos -= translation;
+   
+    pos -= translation;  // Subtract deformation origin from vertex position
     float3 twistedPos = pos; // Initialize the twisted position
 
     // Apply twist along specified axis

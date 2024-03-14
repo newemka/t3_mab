@@ -1,5 +1,5 @@
 {
-  "Name": "DeformMesh3",
+  "Name": "TwistMesh",
   "Id": "8360f1b5-72cc-4bea-8311-537fd7d7b263",
   "Namespace": "lib.3d.mesh.modify",
   "Inputs": [
@@ -16,6 +16,22 @@
       }
     },
     {
+      "Id": "3cd26bc9-7033-490a-9d40-4a4c7fbfc612"/*TwistAxis*/,
+      "DefaultValue": 0
+    },
+    {
+      "Id": "8dc864d0-d24f-4c4b-9e32-03bff786edb5"/*Amount*/,
+      "DefaultValue": 0.5
+    },
+    {
+      "Id": "e5df7fab-30f8-4f88-9309-68ee13a10380"/*UseSelected*/,
+      "DefaultValue": false
+    },
+    {
+      "Id": "61432b75-1756-4270-ad58-26f7a8504db2"/*Shift*/,
+      "DefaultValue": 0.0
+    },
+    {
       "Id": "325a1eed-40db-45df-a6ac-a7e0a5875c49"/*Rotation*/,
       "DefaultValue": {
         "X": 0.0,
@@ -26,26 +42,10 @@
     {
       "Id": "ff444bb6-bfb5-46db-9d22-a4cdc5c185b6"/*Size*/,
       "DefaultValue": {
-        "X": 1.0,
-        "Y": 1.0,
-        "Z": 1.0
+        "X": 0.0,
+        "Y": 0.0,
+        "Z": 0.0
       }
-    },
-    {
-      "Id": "3cd26bc9-7033-490a-9d40-4a4c7fbfc612"/*TwistAxis*/,
-      "DefaultValue": 0
-    },
-    {
-      "Id": "8dc864d0-d24f-4c4b-9e32-03bff786edb5"/*Amount*/,
-      "DefaultValue": 0.0
-    },
-    {
-      "Id": "e5df7fab-30f8-4f88-9309-68ee13a10380"/*UseSelected*/,
-      "DefaultValue": false
-    },
-    {
-      "Id": "61432b75-1756-4270-ad58-26f7a8504db2"/*Shift*/,
-      "DefaultValue": 0.0
     }
   ],
   "Children": [
@@ -56,7 +56,7 @@
         {
           "Id": "afb69c81-5063-4cb9-9d42-841b994b5ec0"/*Source*/,
           "Type": "System.String",
-          "Value": "Resources\\lib\\3d\\mesh\\mesh-Deform.hlsl"
+          "Value": "Resources\\lib\\3d\\mesh\\mesh-Twist.hlsl"
         }
       ],
       "Outputs": []
@@ -223,18 +223,6 @@
       "SourceSlotId": "a25fb1d4-43f2-43b5-b72e-084b32ffcfae",
       "TargetParentOrChildId": "359faced-f0c7-4001-8ad3-bbdaecf0da94",
       "TargetSlotId": "3b817e6c-f532-4a8c-a2ff-a00dc926eeb2"
-    },
-    {
-      "SourceParentOrChildId": "00000000-0000-0000-0000-000000000000",
-      "SourceSlotId": "325a1eed-40db-45df-a6ac-a7e0a5875c49",
-      "TargetParentOrChildId": "359faced-f0c7-4001-8ad3-bbdaecf0da94",
-      "TargetSlotId": "5339862d-5a18-4d0c-b908-9277f5997563"
-    },
-    {
-      "SourceParentOrChildId": "00000000-0000-0000-0000-000000000000",
-      "SourceSlotId": "ff444bb6-bfb5-46db-9d22-a4cdc5c185b6",
-      "TargetParentOrChildId": "359faced-f0c7-4001-8ad3-bbdaecf0da94",
-      "TargetSlotId": "58b9dfb6-0596-4f0d-baf6-7fb3ae426c94"
     },
     {
       "SourceParentOrChildId": "45f302e3-335b-43c0-bae1-fd1204eb0070",
