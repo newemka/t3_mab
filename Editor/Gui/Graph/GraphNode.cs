@@ -265,7 +265,7 @@ namespace T3.Editor.Gui.Graph
                     // A horrible work around to prevent exception because CompositionOp changed during drawing.
                     // A better solution would defer setting the compositionOp to the beginning of next frame.
                     var justOpenedChild = false;
-                    if (hovered && (ImGui.IsMouseDoubleClicked(0) || ImGui.IsKeyPressed((ImGuiKey)Key.I))
+                    if (hovered && (ImGui.IsMouseDoubleClicked(0) || ImGui.IsKeyReleased((ImGuiKey)Key.I) && isHighlighted)
                                 && !RenameInstanceOverlay.IsOpen
                                 && (customUiResult & SymbolChildUi.CustomUiResult.PreventOpenSubGraph) == 0)
                     {

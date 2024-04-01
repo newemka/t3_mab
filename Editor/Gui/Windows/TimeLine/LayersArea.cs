@@ -296,7 +296,7 @@ namespace T3.Editor.Gui.Windows.TimeLine
                 ImGui.EndTooltip();
             }
 
-            if (ImGui.IsItemHovered() && (ImGui.IsMouseDoubleClicked(0) || ImGui.IsKeyPressed((ImGuiKey)Key.I)))
+            if (ImGui.IsItemHovered() && (ImGui.IsMouseDoubleClicked(0) || ImGui.IsKeyReleased((ImGuiKey)Key.I)))
             {
                 //var instance = _compositionOp.Children.Single(child => child.SymbolChildId == symbolChildUi.Id);
                 //SelectionManager.SetSelectionToChildUi(symbolChildUi, instance);
