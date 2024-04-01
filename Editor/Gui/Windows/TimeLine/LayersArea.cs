@@ -18,6 +18,7 @@ using T3.Editor.Gui.Selection;
 using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.UiModel;
+using T3.Core.IO;
 
 namespace T3.Editor.Gui.Windows.TimeLine
 {
@@ -295,7 +296,7 @@ namespace T3.Editor.Gui.Windows.TimeLine
                 ImGui.EndTooltip();
             }
 
-            if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(0))
+            if (ImGui.IsItemHovered() && (ImGui.IsMouseDoubleClicked(0) || ImGui.IsKeyPressed((ImGuiKey)Key.I)))
             {
                 //var instance = _compositionOp.Children.Single(child => child.SymbolChildId == symbolChildUi.Id);
                 //SelectionManager.SetSelectionToChildUi(symbolChildUi, instance);

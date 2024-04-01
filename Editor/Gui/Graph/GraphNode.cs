@@ -4,6 +4,7 @@ using System.Linq;
 using ImGuiNET;
 using SharpDX.Direct3D11;
 using T3.Core.DataTypes.Vector;
+using T3.Core.IO;
 using T3.Core.Logging;
 using T3.Core.Model;
 using T3.Core.Operator;
@@ -264,7 +265,7 @@ namespace T3.Editor.Gui.Graph
                     // A horrible work around to prevent exception because CompositionOp changed during drawing.
                     // A better solution would defer setting the compositionOp to the beginning of next frame.
                     var justOpenedChild = false;
-                    if (hovered && ImGui.IsMouseDoubleClicked(0)
+                    if (hovered && (ImGui.IsMouseDoubleClicked(0) || ImGui.IsKeyPressed((ImGuiKey)Key.I))
                                 && !RenameInstanceOverlay.IsOpen
                                 && (customUiResult & SymbolChildUi.CustomUiResult.PreventOpenSubGraph) == 0)
                     {
