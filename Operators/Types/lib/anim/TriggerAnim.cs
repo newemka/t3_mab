@@ -51,7 +51,7 @@ namespace T3.Operators.Types.Id_95d586a2_ee14_4ff5_a5bb_40c497efde95
             var triggerVariableName = UseTriggerVar.GetValue(context);
             
             var isTriggeredByVar = !Trigger.IsConnected 
-                                   && context.IntVariables.GetValueOrDefault(triggerVariableName, 1 ) == 1;
+                                   && context.IntVariables.GetValueOrDefault(triggerVariableName, 0 ) == 1;
 
             var triggered = Trigger.GetValue(context) || isTriggeredByVar;
             if (triggered != _trigger)
