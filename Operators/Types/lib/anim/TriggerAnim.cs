@@ -40,125 +40,87 @@ namespace T3.Operators.Types.Id_95d586a2_ee14_4ff5_a5bb_40c497efde95
 
             var timeMode = TimeMode.GetEnumValue<Times>(context);
             var currentTime = timeMode switch
-                                  {
-                                      Times.PlayTime   => context.Playback.TimeInBars,
-                                      Times.AppRunTime => Playback.RunTimeInSecs,
-                                      _                => context.LocalFxTime
-                                  };
+                                {
+                                    Times.PlayTime   => context.Playback.TimeInBars,
+                                    Times.AppRunTime => Playback.RunTimeInSecs,
+                                    _                => context.LocalFxTime
+                                };
 
-            var animMode = AnimMode.GetEnumValue<AnimModes>(context);//   (AnimModes)AnimMode.GetValue(context).Clamp(0, Enum.GetNames(typeof(AnimModes)).Length -1);
-
+            var animMode = AnimMode.GetEnumValue<AnimModes>(context);
             var triggerVariableName = UseTriggerVar.GetValue(context);
-            
-            var isTriggeredByVar = !Trigger.IsConnected 
-                                   && context.IntVariables.GetValueOrDefault(triggerVariableName, 1 ) == 1;
 
+            var isTriggeredByVar = !Trigger.IsConnected && context.IntVariables.GetValueOrDefault(triggerVariableName, 1) == 1;
             var triggered = Trigger.GetValue(context) || isTriggeredByVar;
+
+            // Check if the trigger state has changed
             if (triggered != _trigger)
             {
                 HasCompleted.Value = false;
                 _trigger = triggered;
 
-                if (animMode == AnimModes.ForwardAndBackwards)
+                if (triggered)
                 {
                     _triggerTime = currentTime;
-                    _currentDirection = triggered ? Directions.Forward : Directions.Backwards;
-                    _startProgress = LastFraction;
+                    _currentDirection = Directions.Forward;
+
+                    // Start the animation progress at -_delay so that it waits
+                    LastFraction = -_delay / _duration;
                 }
-                else
+                else if (animMode == AnimModes.ForwardAndBackwards || animMode == AnimModes.OnlyOnFalse)
                 {
-                    if (triggered)
-                    {
-                        if (animMode == AnimModes.OnlyOnTrue)
-                        {
-                            _triggerTime = currentTime;
-                            _currentDirection = Directions.Forward;
-                            LastFraction = -_delay;
-                        }
-                    }
-                    else
-                    {
-                        if (animMode == AnimModes.OnlyOnFalse)
-                        {
-                            _triggerTime = currentTime;
-                            _currentDirection = Directions.Backwards;
-                            LastFraction = 1;
-                        }
-                    }
+                    _triggerTime = currentTime;
+                    _currentDirection = Directions.Backwards;
+                    LastFraction = 1;
                 }
             }
 
-
-            if (animMode == AnimModes.ForwardAndBackwards)
+            if (_currentDirection == Directions.Forward && (currentTime - _triggerTime) < _delay)
             {
-                var dp = (float)((currentTime - _triggerTime) / _duration);
+                // If we are within the delay period, keep the animation at the start
+                LastFraction = 0;
+            }
+            else
+            {
+                // Adjust LastFraction based on direction and duration after delay
+                var timeSinceTrigger = currentTime - _triggerTime - _delay;
+                var dp = (float)(timeSinceTrigger / _duration);
+
                 switch (_currentDirection)
                 {
                     case Directions.Forward:
-                    {
-                        LastFraction = _startProgress + dp;
+                        LastFraction = dp;
                         if (LastFraction >= 1)
                         {
-                            HasCompleted.Value = true;
                             LastFraction = 1;
+                            HasCompleted.Value = true;
                             _currentDirection = Directions.None;
                         }
-
                         break;
-                    }
+
                     case Directions.Backwards:
-                    {
-                        LastFraction = _startProgress - dp;
+                        LastFraction = 1 - dp;
                         if (LastFraction <= 0)
                         {
                             LastFraction = 0;
                             _currentDirection = Directions.None;
                         }
-
                         break;
-                    }
                 }
             }
-            else
-            {
-                switch (_currentDirection)
-                {
-                    case Directions.Forward:
-                    {
-                        LastFraction = (currentTime - _triggerTime + 0.00001f)/_duration;
-                        if(LastFraction >= 1)
-                        {
-                            LastFraction = 1;
-                            HasCompleted.Value = true;
-                            _currentDirection = Directions.None;
-                        }
 
-                        break;
-                    }
-                    case Directions.Backwards:
-                    {
-                        LastFraction =   1+( _triggerTime- currentTime )/_duration;
-                        if (LastFraction < 0)
-                        {
-                            LastFraction = 0;
-                            _currentDirection = Directions.None;
-                        }
+            // Calculate normalized value using clamped LastFraction
+            var normalizedValue = CalcNormalizedValueForFraction(Math.Clamp(LastFraction, 0, 1), (int)_shape);
 
-                        break;
-                    }
-                }
-            }
-            
-            var normalizedValue = CalcNormalizedValueForFraction(LastFraction, (int)_shape);
             if (double.IsNaN(LastFraction) || double.IsInfinity(LastFraction))
             {
                 LastFraction = 0;
             }
-            
-            //Result.Value = MathUtils.Lerp(_baseValue, _amplitudeValue,  normalizedValue);
-            Result.Value = _baseValue + _amplitudeValue *  normalizedValue;
+
+            Result.Value = _baseValue + _amplitudeValue * normalizedValue;
+
         }
-        
+
+
         public float CalcNormalizedValueForFraction(double t, int shapeIndex)
         {
             //var fraction = CalcFraction(t);
