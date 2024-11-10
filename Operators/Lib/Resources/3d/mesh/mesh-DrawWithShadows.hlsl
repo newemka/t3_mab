@@ -276,15 +276,20 @@ float4 psMain(psInput pin) : SV_TARGET
 
     float shadowFactor = 1.0;
 
+    
+
     // Check if shadowCoord is within [0,1]
     if (shadowCoord.x >= 0 && shadowCoord.x <= 1 && shadowCoord.y >= 0 && shadowCoord.y <= 1)
     {
         shadowFactor = ComputeShadowFactor(shadowCoord, shadowMapTexelSize, ShadowBias);
     }
-
+    float test = 0.1;
+    float d = length((float2(0.5,0.5)- shadowCoord.xy)/.5);
+    float cone = 1.0 - smoothstep(0.7, 1.0, d);
+    
     // Final fragment color.
     float4 litColor = float4(directLighting + ambientLighting, 1.0) * BaseColor * Color;
-    litColor.rgb = lerp(litColor.rgb, ShadowColor.rgb, (1 - shadowFactor) * ShadowColor.a);
+    litColor.rgb = lerp(litColor.rgb, ShadowColor.rgb, (1 - shadowFactor*cone) * (ShadowColor.a));
     litColor += float4(EmissiveColorMap.Sample(texSampler, pin.texCoord).rgb * EmissiveColor.rgb, 0);
     litColor.rgb = lerp(litColor.rgb, FogColor.rgb, pin.fog * FogColor.a);
     litColor.a *= albedo.a;
