@@ -150,36 +150,24 @@ namespace T3.Core.Utils
         public enum EasingType
         {
             Linear = 0,
-            InOutSine = 1,
-            InOutQuad  = 2,
-            InOutCubic = 3,
-            InOutQuart = 4,
-            InOutQuint = 5,
-            InOutExpo = 6,
-            InOutCirc = 7,
-            InOutBack = 8,
-            InOutElastic = 9,
-            InOutBounce = 10,
-            OutSine = 11,
-            OutQuad = 12,
-            OutCubic = 13,
-            OutQuart = 14,
-            OutQuint = 15,
-            OutExpo = 16,
-            OutCirc = 17,
-            OutBack = 18,
-            OutElastic = 19,
-            OutBounce = 20,
-            InSine = 21,
-            InQuad = 22,
-            InCubic = 23,
-            InQuart = 24,
-            InQuint = 25,
-            InExpo = 26,
-            InCirc = 27,
-            InBack = 28,
-            InElastic = 29,
-            InBounce = 30,
+            Sine = 1,
+            Quad = 2,
+            Cubic = 3,
+            Quart = 4,
+            Quint = 5,
+            Expo = 6,
+            Circ = 7,
+            Back = 8,
+            Elastic = 9,
+            Bounce = 10,
+          
+        }
+
+        public enum EaseDirection
+        {
+            In = 0,
+            Out = 1,
+            InOut = 2,
         }
 
     }
