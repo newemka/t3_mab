@@ -2722,13 +2722,7 @@
     {
       "Id": "dfbed4dc-e4fc-4cef-b57a-58967f942152"/*Layer2d*/,
       "SymbolId": "d8c5330f-59b5-4907-b845-a02def3042fa",
-      "InputValues": [
-        {
-          "Id": "7c0dd576-326f-4120-a632-787ad4cf4818"/*Filter*/,
-          "Type": "SharpDX.Direct3D11.Filter",
-          "Value": "MinMagMipPoint"
-        }
-      ],
+      "InputValues": [],
       "Outputs": []
     },
     {

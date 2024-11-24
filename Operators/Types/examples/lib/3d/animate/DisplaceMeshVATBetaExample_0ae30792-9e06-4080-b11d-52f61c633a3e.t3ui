@@ -167,8 +167,8 @@
     {
       "ChildId": "c4b1190c-6618-443f-8387-01d49a5a4477"/*QuadMesh*/,
       "Position": {
-        "X": 1060.0298,
-        "Y": 34.272964
+        "X": 1048.301,
+        "Y": 30.084183
       }
     },
     {
@@ -209,36 +209,36 @@
     {
       "ChildId": "c37bc74c-5550-4b39-9bbe-9b86658e1d60"/*Camera*/,
       "Position": {
-        "X": 1903.9956,
-        "Y": -52.33551
+        "X": 2095.232,
+        "Y": -50.364014
       }
     },
     {
       "ChildId": "15fb3f0e-761c-4ef4-a52e-5dd6fab1691e"/*RenderTarget*/,
       "Position": {
-        "X": 2058.7666,
-        "Y": -47.510223
+        "X": 2535.8716,
+        "Y": -6.108551
       }
     },
     {
       "ChildId": "f496acdb-e0cd-471f-a277-7e78164599e7"/*Position*/,
       "Position": {
-        "X": 1473.8751,
-        "Y": 102.03198
+        "X": 1436.4165,
+        "Y": 277.49622
       }
     },
     {
-      "ChildId": "e668ad19-87d0-41aa-a38b-16677355f779"/*APoint*/,
+      "ChildId": "e668ad19-87d0-41aa-a38b-16677355f779"/*LightPosition*/,
       "Position": {
         "X": 1400.1868,
         "Y": 171.39087
       }
     },
     {
-      "ChildId": "5198925b-9f3a-48d8-abe5-b5218895f0da"/*APoint*/,
+      "ChildId": "5198925b-9f3a-48d8-abe5-b5218895f0da"/*SpotTarget*/,
       "Position": {
-        "X": 1384.7064,
-        "Y": 78.50833
+        "X": 1400.1868,
+        "Y": 227.39087
       }
     },
     {
@@ -581,14 +581,42 @@
         "X": 1369.1189,
         "Y": 2526.496
       }
+    },
+    {
+      "ChildId": "fe3e281f-bf2d-454c-a5e2-525f61e7b867"/*SetEnvironment*/,
+      "Position": {
+        "X": 1919.9718,
+        "Y": -45.88266
+      }
+    },
+    {
+      "ChildId": "5b734f8f-72d6-49a2-b8ec-95c979d6af7d"/*TextureToCubeMap*/,
+      "Position": {
+        "X": 1777.6465,
+        "Y": 235.88843
+      }
+    },
+    {
+      "ChildId": "cd6448b3-d26c-4905-b59f-be0e49927790"/*Transform*/,
+      "Position": {
+        "X": 951.10547,
+        "Y": 959.7739
+      }
+    },
+    {
+      "ChildId": "6c42ee2f-4fce-46a8-9a18-1a26f2e56b85"/*AnimValue*/,
+      "Position": {
+        "X": 1286.4165,
+        "Y": 277.49622
+      }
     }
   ],
   "OutputUis": [
     {
       "OutputId": "d72b1519-797c-40f6-9660-731b83261020"/*Output*/,
       "Position": {
-        "X": 2347.7463,
-        "Y": 229.236
+        "X": 2824.8513,
+        "Y": 270.63766
       }
     }
   ]

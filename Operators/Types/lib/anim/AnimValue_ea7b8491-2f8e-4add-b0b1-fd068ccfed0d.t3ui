@@ -21,7 +21,7 @@
       "Min": -5.0,
       "Max": 5.0,
       "Clamp": true,
-      "Format": "{0:0.000} ×"
+      "Format": "{0:0.000}"
     },
     {
       "InputId": "8327e7ec-4370-4a3e-bd69-db3f4aa4b1d7"/*Ratio*/,
@@ -53,7 +53,7 @@
       "AddPadding": "True",
       "Min": -5.0,
       "Max": 5.0,
-      "Format": "{0:0.000} ×"
+      "Format": "{0:0.000}"
     },
     {
       "InputId": "ddd93b06-118e-43e0-85f6-c150faf91d04"/*Offset*/,

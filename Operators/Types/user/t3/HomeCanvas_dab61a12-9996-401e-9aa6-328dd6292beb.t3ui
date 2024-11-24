@@ -142,8 +142,107 @@
     {
       "ChildId": "384fbe84-68f3-47bb-ba5e-c46efa60958b"/*DrawShadowResearch*/,
       "Position": {
-        "X": -1619.7617,
-        "Y": -4193.0967
+        "X": -1764.527,
+        "Y": -4232.7725
+      }
+    },
+    {
+      "ChildId": "dc520428-e99a-4777-9b42-a0b7b07f2d3c"/*DisplaceMeshVATBetaExample*/,
+      "Position": {
+        "X": -2005.2981,
+        "Y": -4224.9644
+      }
+    },
+    {
+      "ChildId": "0b8cb384-6a06-4444-a8e8-8cda3be44553"/*Ease*/,
+      "Comment": "try the different modes",
+      "Position": {
+        "X": -2055.5142,
+        "Y": -3956.34
+      }
+    },
+    {
+      "ChildId": "7a0298d4-7327-4d8c-844c-1758506a63a6"/*LoadObj*/,
+      "Position": {
+        "X": -2055.5142,
+        "Y": -4012.34
+      }
+    },
+    {
+      "ChildId": "5785402e-03c1-4354-928a-5c4aba0345fa"/*DrawMesh*/,
+      "Position": {
+        "X": -1905.5138,
+        "Y": -4012.34
+      }
+    },
+    {
+      "ChildId": "7ca59a0e-2314-4ac5-add6-2898072e740e"/*Camera*/,
+      "Position": {
+        "X": -1605.5138,
+        "Y": -4007.5146
+      }
+    },
+    {
+      "ChildId": "b1f38f4e-3950-4355-ab29-a7a46831b41b"/*RenderTarget*/,
+      "Position": {
+        "X": -1445.2609,
+        "Y": -3998.304
+      }
+    },
+    {
+      "ChildId": "f143df79-d3a0-4f62-bc69-ae009bc20839"/*Transform*/,
+      "Position": {
+        "X": -1755.5138,
+        "Y": -4012.34
+      }
+    },
+    {
+      "ChildId": "daecc502-60d4-40e5-9bcb-396a892b9ece"/*Vector3*/,
+      "Position": {
+        "X": -1905.5138,
+        "Y": -3956.34
+      }
+    },
+    {
+      "ChildId": "ff46eda3-a437-493e-8a9e-b6127c38bbf8"/*AnimValue*/,
+      "Position": {
+        "X": -2229.961,
+        "Y": -3941.0078
+      }
+    },
+    {
+      "ChildId": "3148200d-f3fe-4597-a613-cff588322f83"/*KeyboardInput2*/,
+      "Position": {
+        "X": -2134.8184,
+        "Y": -3731.5398
+      }
+    },
+    {
+      "ChildId": "ae842aa6-ad26-49e7-a855-3f1029c83df2"/*IntToString*/,
+      "Position": {
+        "X": -1984.8184,
+        "Y": -3731.5398
+      }
+    },
+    {
+      "ChildId": "706a7352-15cc-467c-919c-ad6aefc9ac33"/*Text*/,
+      "Position": {
+        "X": -1834.8184,
+        "Y": -3731.5398
+      }
+    },
+    {
+      "ChildId": "76442eff-5343-4c62-903c-f7ccec03c055"/*RenderTarget*/,
+      "Position": {
+        "X": -1684.8184,
+        "Y": -3731.5398
+      }
+    },
+    {
+      "ChildId": "14759574-2d65-42a7-b0cd-1f49c96213b8"/*CrackDonut*/,
+      "Position": {
+        "X": -1604.5331,
+        "Y": -3543.5654
       }
     }
   ],
@@ -237,6 +336,42 @@
       "Size": {
         "X": 925.6778,
         "Y": 161.1207
+      }
+    },
+    {
+      "Id": "7652f128-785d-46c7-b0d7-6af967d73191",
+      "Title": "# VAT and SpotLight",
+      "Color": {
+        "X": 0.6,
+        "Y": 0.6,
+        "Z": 0.6,
+        "W": 1.0
+      },
+      "Position": {
+        "X": -2053.4722,
+        "Y": -4332.4736
+      },
+      "Size": {
+        "X": 473.3053,
+        "Y": 149.96338
+      }
+    },
+    {
+      "Id": "cbda6ed1-655f-481f-bb9d-d08888fb07ac",
+      "Title": "# Ease",
+      "Color": {
+        "X": 0.6,
+        "Y": 0.6,
+        "Z": 0.6,
+        "W": 1.0
+      },
+      "Position": {
+        "X": -2289.961,
+        "Y": -4072.34
+      },
+      "Size": {
+        "X": 1014.7001,
+        "Y": 214.33228
       }
     }
   ],
