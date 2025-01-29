@@ -16,11 +16,11 @@
     },
     {
       "Id": "38f566a4-d41f-43d7-9ee5-1be3cb20e21c"/*UseAppRunTime*/,
-      "DefaultValue": false
+      "DefaultValue": true
     },
     {
       "Id": "5f2c66dd-dfaf-4aa0-b184-01e89819b317"/*Mode*/,
-      "DefaultValue": 3
+      "DefaultValue": 2
     },
     {
       "Id": "19da524f-6cea-4da0-8ee2-9b47ef8a93a7"/*Interpolation*/,

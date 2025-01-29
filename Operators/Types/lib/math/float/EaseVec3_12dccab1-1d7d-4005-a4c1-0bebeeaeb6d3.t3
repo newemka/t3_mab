@@ -17,7 +17,7 @@
     },
     {
       "Id": "2a450207-489e-4a8d-83ab-37ed8167eebe"/*UseAppRunTime*/,
-      "DefaultValue": false
+      "DefaultValue": true
     },
     {
       "Id": "1867ff18-f510-4c84-a3be-a4123e878133"/*Mode*/,
@@ -25,7 +25,7 @@
     },
     {
       "Id": "9ef45ff9-9d59-44b7-b03d-37a1be40a776"/*Interpolation*/,
-      "DefaultValue": 0
+      "DefaultValue": 6
     }
   ],
   "Children": [],

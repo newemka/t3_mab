@@ -213,6 +213,36 @@
       "SymbolId": "0fc6dc9f-713f-4f59-922b-3224454704c5",
       "InputValues": [],
       "Outputs": []
+    },
+    {
+      "Id": "8a22c77e-9ce1-4c2e-ab59-77a182a13a2c"/*DisplaceMeshVATBetaExample*/,
+      "SymbolId": "0ae30792-9e06-4080-b11d-52f61c633a3e",
+      "InputValues": [],
+      "Outputs": []
+    },
+    {
+      "Id": "1fb81d8e-1bd6-4925-a416-29991eda602f"/*RenderTarget*/,
+      "SymbolId": "f9fe78c5-43a6-48ae-8e8c-6cdbbc330dd1",
+      "InputValues": [],
+      "Outputs": []
+    },
+    {
+      "Id": "d65e24c6-0696-48d5-89b8-34c7255a968f"/*StarGlowStreaksExample*/,
+      "SymbolId": "4fdd6f40-c099-4caa-a05b-67c8a45961bb",
+      "InputValues": [],
+      "Outputs": []
+    },
+    {
+      "Id": "9e69691a-265a-4f28-b147-fbe3772df0e9"/*WorleyNoiseExample*/,
+      "SymbolId": "e3c3942b-451e-4e71-b6d8-ca5a6acd7ce1",
+      "InputValues": [],
+      "Outputs": []
+    },
+    {
+      "Id": "0494e74e-775f-468c-b63f-9a0e772b9978"/*EaseExample*/,
+      "SymbolId": "809d1560-349b-4b34-ac37-2770c9f76d98",
+      "InputValues": [],
+      "Outputs": []
     }
   ],
   "Connections": [
@@ -221,6 +251,12 @@
       "SourceSlotId": "ae4addf0-08cf-4b25-9515-4fef9359d183",
       "TargetParentOrChildId": "018e0408-fac8-42f0-a17c-b9c0bb5ab5b7",
       "TargetSlotId": "a4527e01-f19a-4200-85e5-00144f3ce061"
+    },
+    {
+      "SourceParentOrChildId": "384fbe84-68f3-47bb-ba5e-c46efa60958b",
+      "SourceSlotId": "fa86ae74-4a84-4ae3-8bcc-2f28414efa29",
+      "TargetParentOrChildId": "1fb81d8e-1bd6-4925-a416-29991eda602f",
+      "TargetSlotId": "4da253b7-4953-439a-b03f-1d515a78bddf"
     },
     {
       "SourceParentOrChildId": "dda89242-8a90-4442-b3df-ed2d855e32a4",
