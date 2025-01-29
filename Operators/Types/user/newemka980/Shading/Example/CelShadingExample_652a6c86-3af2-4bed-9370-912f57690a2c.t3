@@ -9,21 +9,6 @@
       "SymbolId": "dcacc281-92c6-4e47-8eea-91fa8954ed86",
       "InputValues": [
         {
-          "Id": "e1e45d58-4aa1-4bf4-8e9d-3b64cf82fd89"/*EdgeColor*/,
-          "Type": "System.Numerics.Vector4",
-          "Value": {
-            "X": 0.0,
-            "Y": 0.0,
-            "Z": 0.0,
-            "W": 1.0
-          }
-        },
-        {
-          "Id": "a9a04304-2af3-49e8-a28e-bcac8361b17e"/*EdgeThresold*/,
-          "Type": "System.Single",
-          "Value": 0.31
-        },
-        {
           "Id": "3d2eaff6-9b02-4bc9-9ebc-76f5888943f6"/*Shading*/,
           "Type": "T3.Core.DataTypes.Gradient",
           "Value": {
@@ -99,7 +84,6 @@
     },
     {
       "Id": "e202813f-c1f9-4cd2-b2d2-7416fa77712e"/*PointLight*/,
-      "IsBypassed": true,
       "SymbolId": "9c67a8c8-839f-4f67-a949-08cb38b9dffd",
       "InputValues": [
         {
@@ -107,14 +91,14 @@
           "Type": "System.Numerics.Vector3",
           "Value": {
             "X": 1.4945109,
-            "Y": 0.9962407,
+            "Y": 1.37,
             "Z": 1.8064713
           }
         },
         {
           "Id": "98155900-1bb9-427a-9c4e-0988fec806cd"/*Intensity*/,
           "Type": "System.Single",
-          "Value": 1.0
+          "Value": 0.5
         }
       ],
       "Outputs": []
@@ -128,7 +112,7 @@
           "Type": "System.Numerics.Vector3",
           "Value": {
             "X": 0.13577884,
-            "Y": 0.8551806,
+            "Y": 1.67,
             "Z": 4.1470003
           }
         },
@@ -163,7 +147,6 @@
     },
     {
       "Id": "490e6225-7cbb-4869-ba0c-b32a05054fda"/*PointLight*/,
-      "IsBypassed": true,
       "SymbolId": "9c67a8c8-839f-4f67-a949-08cb38b9dffd",
       "InputValues": [
         {
@@ -178,7 +161,7 @@
         {
           "Id": "98155900-1bb9-427a-9c4e-0988fec806cd"/*Intensity*/,
           "Type": "System.Single",
-          "Value": 1.0
+          "Value": 0.5
         }
       ],
       "Outputs": []
