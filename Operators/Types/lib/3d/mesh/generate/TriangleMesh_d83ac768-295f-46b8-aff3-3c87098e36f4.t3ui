@@ -1,0 +1,23 @@
+{
+  "Id": "d83ac768-295f-46b8-aff3-3c87098e36f4"/*TriangleMesh*/,
+  "Description": "",
+  "InputUis": [
+    {
+      "InputId": "6dce5a38-6d1f-48d0-811d-f2d3d39d5acd"/*DataList*/,
+      "Position": {
+        "X": -197.09735,
+        "Y": 162.8832
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "2987f159-17e8-4ec4-826a-3a3e0e899675"/*Data*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 0.0
+      }
+    }
+  ]
+}
