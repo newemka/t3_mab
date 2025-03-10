@@ -1,5 +1,5 @@
 {
-  "Name": "TriangleMesh",
+  "Name": "TriangleFanMesh",
   "Id": "d83ac768-295f-46b8-aff3-3c87098e36f4",
   "Namespace": "lib.3d.mesh.generate",
   "Inputs": [

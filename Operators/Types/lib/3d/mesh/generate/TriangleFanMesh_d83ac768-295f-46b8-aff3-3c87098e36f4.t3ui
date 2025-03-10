@@ -1,5 +1,5 @@
 {
-  "Id": "d83ac768-295f-46b8-aff3-3c87098e36f4"/*TriangleMesh*/,
+  "Id": "d83ac768-295f-46b8-aff3-3c87098e36f4"/*TriangleFanMesh*/,
   "Description": "",
   "InputUis": [
     {
