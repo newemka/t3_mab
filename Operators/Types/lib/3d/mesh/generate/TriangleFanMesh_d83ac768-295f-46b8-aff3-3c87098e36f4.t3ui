@@ -3,6 +3,13 @@
   "Description": "",
   "InputUis": [
     {
+      "InputId": "f7f76ac4-b324-4fc9-8080-edc43865a4c5"/*UvMode*/,
+      "Position": {
+        "X": -197.09735,
+        "Y": 117.883194
+      }
+    },
+    {
       "InputId": "6dce5a38-6d1f-48d0-811d-f2d3d39d5acd"/*DataList*/,
       "Position": {
         "X": -197.09735,

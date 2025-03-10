@@ -28,6 +28,8 @@ namespace T3.Operators.Types.Id_d83ac768_295f_46b8_aff3_3c87098e36f4
 
         private void Update(EvaluationContext context)
         {
+
+            var uvModeValue = UvMode.GetValue(context);
             try
             {
                 var resourceManager = ResourceManager.Instance();
@@ -100,36 +102,71 @@ namespace T3.Operators.Types.Id_d83ac768_295f_46b8_aff3_3c87098e36f4
                     var tangent = Vector3.Normalize(edge1);
                     var binormal = Vector3.Normalize(Vector3.Cross(normal, tangent));
 
-                    // Assign vertices with original UV mapping
-                    _vertexBufferData[0] = new PbrVertex
+                    if (uvModeValue == 0)
                     {
-                        Position = points[0],
-                        Normal = normal,
-                        Tangent = tangent,
-                        Bitangent = binormal,
-                        Texcoord = new Vector2(0.5f, 0.5f),
-                        Selection = 1,
-                    };
+                        // Assign vertices with original UV mapping
+                        _vertexBufferData[0] = new PbrVertex
+                        {
+                            Position = points[0],
+                            Normal = normal,
+                            Tangent = tangent,
+                            Bitangent = binormal,
+                            Texcoord = new Vector2(0.5f, 0.5f),
+                            Selection = 1,
+                        };
 
-                    _vertexBufferData[1] = new PbrVertex
-                    {
-                        Position = points[1],
-                        Normal = normal,
-                        Tangent = tangent,
-                        Bitangent = binormal,
-                        Texcoord = new Vector2(0.0f, 0.0f),
-                        Selection = 1,
-                    };
+                        _vertexBufferData[1] = new PbrVertex
+                        {
+                            Position = points[1],
+                            Normal = normal,
+                            Tangent = tangent,
+                            Bitangent = binormal,
+                            Texcoord = new Vector2(0.0f, 0.0f),
+                            Selection = 1,
+                        };
 
-                    _vertexBufferData[2] = new PbrVertex
+                        _vertexBufferData[2] = new PbrVertex
+                        {
+                            Position = points[2],
+                            Normal = normal,
+                            Tangent = tangent,
+                            Bitangent = binormal,
+                            Texcoord = new Vector2(1.0f, 0.0f),
+                            Selection = 1,
+                        };
+                    }
+                    else
                     {
-                        Position = points[2],
-                        Normal = normal,
-                        Tangent = tangent,
-                        Bitangent = binormal,
-                        Texcoord = new Vector2(1.0f, 0.0f),
-                        Selection = 1,
-                    };
+                        _vertexBufferData[0] = new PbrVertex
+                        {
+                            Position = points[0],
+                            Normal = normal,
+                            Tangent = tangent,
+                            Bitangent = binormal,
+                            Texcoord = new Vector2(0.5f, 1.0f),
+                            Selection = 1,
+                        };
+
+                        _vertexBufferData[1] = new PbrVertex
+                        {
+                            Position = points[1],
+                            Normal = normal,
+                            Tangent = tangent,
+                            Bitangent = binormal,
+                            Texcoord = new Vector2(0.0f, 0.0f),
+                            Selection = 1,
+                        };
+
+                        _vertexBufferData[2] = new PbrVertex
+                        {
+                            Position = points[2],
+                            Normal = normal,
+                            Tangent = tangent,
+                            Bitangent = binormal,
+                            Texcoord = new Vector2(1.0f, 0.0f),
+                            Selection = 1,
+                        };
+                    }
                 }
                 else
                 {
@@ -164,7 +201,7 @@ namespace T3.Operators.Types.Id_d83ac768_295f_46b8_aff3_3c87098e36f4
                         var normal = Vector3.Normalize(Vector3.Cross(edge1, edge2));
                         var tangent = Vector3.Normalize(edge1);
                         var binormal = Vector3.Normalize(Vector3.Cross(normal, tangent));
-
+                        
                         // Add three vertices for this triangle with the same normal
                         _vertexBufferData[vertexIndex] = new PbrVertex
                         {
@@ -280,6 +317,9 @@ namespace T3.Operators.Types.Id_d83ac768_295f_46b8_aff3_3c87098e36f4
         private readonly BufferWithViews _indexBufferWithViews = new();
 
         private readonly MeshBuffers _data = new();
+
+        [Input(Guid = "f7f76ac4-b324-4fc9-8080-edc43865a4c5")]
+        public readonly InputSlot<int> UvMode = new();
 
         [Input(Guid = "6dce5a38-6d1f-48d0-811d-f2d3d39d5acd")]
         public readonly InputSlot<StructuredList> DataList = new();
