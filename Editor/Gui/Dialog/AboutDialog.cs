@@ -17,7 +17,7 @@ internal sealed class AboutDialog : ModalDialog
 {
     internal void Draw()
     {
-        DialogSize = new Vector2(500, 550) * T3Ui.UiScaleFactor;
+        DialogSize = new Vector2(500, 550);
         
         if (BeginDialog("About TiXL"))
         {
