@@ -91,7 +91,13 @@ internal sealed class PointsToCPU : Instance<PointsToCPU>
                                    _bufferWithViewsCpuAccess.Buffer.Description.StructureByteStride;
                     
                 var points = sourceStream.ReadRange<Point>(elementCount);
-                    
+
+                // Apply deduplication if enabled
+                if (RemoveDuplicates.GetValue(context))
+                {
+                    points = GetUniquePoints(points);
+                }
+
                 //Log.Debug($"Read {points.Length} elements", this);
                 Output.Value = new StructuredList<Point>(points);
             }
@@ -106,6 +112,27 @@ internal sealed class PointsToCPU : Instance<PointsToCPU>
         }
     }
 
+    private Point[] GetUniquePoints(Point[] points)
+    {
+        // Use a dictionary to track unique positions with some tolerance for floating point imprecision
+        var uniquePoints = new Dictionary<string, Point>();
+        const float tolerance = 0.00001f;
+
+        foreach (var point in points)
+        {
+            // Create a key based on rounded position
+            string key = $"{Math.Round(point.Position.X / tolerance) * tolerance}:" +
+                         $"{Math.Round(point.Position.Y / tolerance) * tolerance}:" +
+                         $"{Math.Round(point.Position.Z / tolerance) * tolerance}";
+
+            if (!uniquePoints.ContainsKey(key))
+            {
+                uniquePoints.Add(key, point);
+            }
+        }
+
+        return uniquePoints.Values.ToArray();
+    }
 
     private bool _triggerUpdate;
     private BufferWithViews _bufferWithViewsCpuAccess = new();
@@ -119,5 +146,7 @@ internal sealed class PointsToCPU : Instance<PointsToCPU>
     [Input(Guid = "77EE7CA9-A2DB-4DE9-BB9C-21EC4F1BBEAF")]
     public readonly InputSlot<bool> UpdateContinuously = new();
 
-        
+    [Input(Guid = "D1A2B3C4-5678-90EF-1234-567890ABCDEF")]
+    public readonly InputSlot<bool> RemoveDuplicates = new();
+
 }

@@ -6,6 +6,10 @@
       "DefaultValue": true
     },
     {
+      "Id": "d1a2b3c4-5678-90ef-1234-567890abcdef"/*RemoveDuplicates*/,
+      "DefaultValue": false
+    },
+    {
       "Id": "eff239da-39e9-41d3-968b-c74723ec2545"/*TriggerUpdate*/,
       "DefaultValue": true
     },
