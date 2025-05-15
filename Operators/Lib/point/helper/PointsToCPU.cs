@@ -114,25 +114,30 @@ internal sealed class PointsToCPU : Instance<PointsToCPU>
 
     private Point[] GetUniquePoints(Point[] points)
     {
-        // Use a dictionary to track unique positions with some tolerance for floating point imprecision
-        var uniquePoints = new Dictionary<string, Point>();
         const float tolerance = 0.00001f;
+        var scale = 1f / tolerance;
+
+        var uniquePoints = new Dictionary<(int, int, int), Point>();
 
         foreach (var point in points)
         {
-            // Create a key based on rounded position
-            string key = $"{Math.Round(point.Position.X / tolerance) * tolerance}:" +
-                         $"{Math.Round(point.Position.Y / tolerance) * tolerance}:" +
-                         $"{Math.Round(point.Position.Z / tolerance) * tolerance}";
+            var pos = point.Position;
+            var key = (
+                (int)MathF.Round(pos.X * scale),
+                (int)MathF.Round(pos.Y * scale),
+                (int)MathF.Round(pos.Z * scale)
+            );
 
             if (!uniquePoints.ContainsKey(key))
             {
-                uniquePoints.Add(key, point);
+                uniquePoints[key] = point;
             }
         }
 
         return uniquePoints.Values.ToArray();
     }
+
+
 
     private bool _triggerUpdate;
     private BufferWithViews _bufferWithViewsCpuAccess = new();
