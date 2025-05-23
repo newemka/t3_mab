@@ -95,6 +95,11 @@ internal abstract class ScalableCanvas : IScalableCanvas
         return (posOnCanvas - Scroll) * Scale * T3Ui.UiScaleFactor + WindowPos;
     }
 
+    public virtual Vector2 RawTransformPositionFloat(Vector2 posOnCanvas)
+    {
+        return (posOnCanvas - Scroll) * Scale + WindowPos;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector2 TransformPosition(Vector2 posOnCanvas)
     {
@@ -117,7 +122,7 @@ internal abstract class ScalableCanvas : IScalableCanvas
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float TransformY(float yOnCanvas)
     {
-        return TransformPositionFloat(new Vector2(0, yOnCanvas)).Y;
+        return RawTransformPositionFloat(new Vector2(0, yOnCanvas)).Y;
     }
 
     /// <summary>
