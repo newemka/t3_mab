@@ -29,4 +29,7 @@ internal sealed class Image2dSDF : Instance<Image2dSDF>
 
         [Input(Guid = "59297115-f0cd-449e-be89-8a7ccbb0aa44")]
         public readonly InputSlot<float> Offset = new InputSlot<float>();
+
+        [Input(Guid = "46961f5e-24b5-4e4f-9e7e-ddcb3776cf7d")]
+        public readonly InputSlot<float> Height = new InputSlot<float>();
 }

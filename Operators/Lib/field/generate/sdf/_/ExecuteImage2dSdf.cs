@@ -34,34 +34,38 @@ internal sealed class ExecuteImage2dSdf : Instance<ExecuteImage2dSdf>
     void IGraphNodeOp.AddDefinitions(CodeAssembleContext c)
     {
         c.Definitions.Append($$"""
-                                   float sdf2DColumn{{ShaderNode}}(float2 pos, float2 imageSize, float sdfScale)
-                                   {
-                                       float2 uv = pos / imageSize; // image projected onto XY plane
-                                       uv.y *= -1;
-                                       uv += 0.5;
-                                       float2 clampedUV = clamp(uv, 0.0, 1.0);
-                                       float2 delta = uv - clampedUV;
-                                   
-                                       float texDist = 1-saturate({{ShaderNode}}SdfImage.SampleLevel(ClampedSampler, clampedUV, 0.0));
-                                       texDist *= sdfScale;
-                                   
-                                       float2 worldDelta = delta * imageSize;
-                                       float outsideDist = length(worldDelta);
-                                   
-                                       // If inside bounds, return texture value
-                                       if (all(uv >= 0.0) && all(uv <= 1.0))
-                                           return texDist;
-                                   
-                                       // Outside bounds: approximate distance to closest edge or corner
-                                       return sqrt( outsideDist*outsideDist + texDist*texDist);
-                                   }
-                                   """);
+                                float sdf2DExtruded{{ShaderNode}}(float3 p, float2 imageSize, float sdfScale, float halfHeight)
+                                {
+                                    float2 uv = p.xy / imageSize;
+                                    uv.y *= -1;
+                                    uv += 0.5;
+
+                                    float2 clampedUV = clamp(uv, 0.0, 1.0);
+                                    float2 delta = uv - clampedUV;
+                                    float2 worldDelta = delta * imageSize;
+                                    float outside2D = length(worldDelta);
+
+                                    float texDist = 1.0 - saturate({{ShaderNode}}SdfImage.SampleLevel(ClampedSampler, clampedUV, 2.0));
+                                    float d2d = texDist * sdfScale;
+
+                                    float dz = abs(p.z) - halfHeight;
+                                    float2 w = float2(d2d, dz);
+                                    float extrusionDist = min(max(w.x, w.y), 0.0) + length(max(w, 0.0));
+
+                                    if (all(uv >= 0.0) && all(uv <= 1.0))
+                                        return extrusionDist;
+
+                                    return sqrt(outside2D * outside2D + extrusionDist * extrusionDist);
+                                }
+                            """);
+
     }
 
     bool IGraphNodeOp.TryBuildCustomCode(CodeAssembleContext c)
     {
-        c.AppendCall($"f{c}.w = (sdf2DColumn{ShaderNode}(p.xy, {ShaderNode}Size, {ShaderNode}Scale) + {ShaderNode}Offset); ");
-        c.AppendCall($"f{c}.xyz = p.w < 0.5 ?  p{c}.xyz : 1;"); // save local space
+        c.AppendCall($"f{c}.w = (sdf2DExtruded{ShaderNode}(p{c}.xyz, {ShaderNode}Size, {ShaderNode}Scale, {ShaderNode}Height) + {ShaderNode}Offset);");
+        c.AppendCall($"f{c}.xyz = p.w < 0.5 ? p{c}.xyz : 1;");
+
         return true;
     }
 
@@ -97,4 +101,9 @@ internal sealed class ExecuteImage2dSdf : Instance<ExecuteImage2dSdf>
     [GraphParam]
     [Input(Guid = "7C1B8678-3961-43E7-9F61-DF4C82FB5C63")]
     public readonly InputSlot<float> Offset = new();
+
+    [GraphParam]
+    [Input(Guid = "D9F8D441-F6A3-411B-A3D2-34A7D729DAB5")]
+    public readonly InputSlot<float> Height = new();
+
 }
