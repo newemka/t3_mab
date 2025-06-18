@@ -32,20 +32,14 @@ internal sealed class RotateTowards : Instance<RotateTowards>
 
         var sourcePos = Vector4.Transform(new Vector4(0, 0, 0, 1), context.ObjectToWorld).ToVector3();
         var direction = targetPosDx - sourcePos;
-
+        direction = Vector3.Normalize(direction);
         Matrix4x4 lookAt;
         switch (targetMode)
         {
             case Modes.TowardPositionLockedXZ:
                 // Lock X and Z rotation (only Y rotation)
                 direction.Y = 0;
-                direction = Vector3.Normalize(direction);
-                lookAt = GraphicsMath.LookAtRH(Vector3.Zero, -direction, new Vector3(0f, 1f, 0f));
-                break;
-
-            case Modes.TowardPositionLockedZ:
-                // Lock Z rotation (allow X and Y rotation)
-                var flatForward = Vector3.Normalize(new Vector3(direction.X, direction.Y, 0));
+               
                 lookAt = GraphicsMath.LookAtRH(Vector3.Zero, -direction, new Vector3(0f, 1f, 0f));
                 break;
 
@@ -88,6 +82,5 @@ internal sealed class RotateTowards : Instance<RotateTowards>
         TowardsCamera,
         TowardsPosition,
         TowardPositionLockedXZ,
-        TowardPositionLockedZ
     }
 }
