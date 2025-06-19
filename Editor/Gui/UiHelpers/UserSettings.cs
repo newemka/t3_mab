@@ -141,10 +141,8 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
 
         public string ColorThemeName = string.Empty;
             
-        // Other
         public bool ExpandSpectrumVisualizerVertically = true;
-        public int GridOutputColumnCount = 16;
-
+            
         //private string _defaultNewProjectDirectory = _defaultProjectFolder;
         //public string DefaultNewProjectDirectory => _defaultNewProjectDirectory ??= _defaultProjectFolder;
 

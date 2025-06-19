@@ -335,15 +335,12 @@ internal sealed partial class MagGraphCanvas
                         var inputIndex = 0;
                         foreach (var inputUi in childUi.InputUis.Values)
                         {
-                            if (inputIndex <= item.Instance!.Inputs.Count)
+                            var input = item.Instance!.Inputs[inputIndex];
+                            if (inputUi.Type == context.DraggedPrimaryOutputType)
                             {
-                                var input = item.Instance!.Inputs[inputIndex];
-                                if (inputUi.Type == context.DraggedPrimaryOutputType)
-                                {
-                                    var isConnected = input.HasInputConnections;
-                                    var prefix = isConnected ? "× " : "   ";
-                                    ImGui.Selectable(prefix + inputUi.InputDefinition.Name);
-                                }
+                                var isConnected = input.HasInputConnections;
+                                var prefix = isConnected ? "× " : "   ";
+                                ImGui.Selectable(prefix + inputUi.InputDefinition.Name);
                             }
 
                             inputIndex++;

@@ -666,11 +666,11 @@ internal sealed class ParameterWindow : Window
             ImGui.ColorEdit4("color", ref annotation.Color.Rgba);
 
             FormInputs.AddVerticalSpace();
-            CustomComponents.StylizedText("Label:", Fonts.FontBold, UiColors.TextMuted, true);
+            CustomComponents.StylizedText("Label:", Fonts.FontBold, UiColors.TextMuted);
             ImGui.TextWrapped(annotation.Label);
 
             FormInputs.AddVerticalSpace();
-            CustomComponents.StylizedText("Description:", Fonts.FontBold, UiColors.TextMuted.Rgba, true);
+            CustomComponents.StylizedText("Description:", Fonts.FontBold, UiColors.TextMuted.Rgba);
             ImGui.TextWrapped(annotation.Title);
 
             FormInputs.AddVerticalSpace();

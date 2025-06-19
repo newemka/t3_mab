@@ -1,3 +1,4 @@
+#nullable enable
 using System.Diagnostics;
 using ImGuiNET;
 using T3.Core.Operator;

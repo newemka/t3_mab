@@ -1,34 +1,25 @@
 ﻿using ImGuiNET;
 using T3.Core.Operator;
 using T3.Editor.Gui.Interaction;
+using T3.Editor.Gui.UiHelpers;
 using T3.Editor.UiModel.InputsAndTypes;
 
-namespace T3.Editor.Gui.InputUi.ListInputs;
+namespace T3.Editor.Gui.InputUi.SingleControl;
 
-/// <summary>
-/// Provides a generic UI for editing lists of base value types like int, float and string.
-/// </summary>
-internal abstract class ListInputValueUi<T> : InputValueUi<T>
+internal sealed class FloatListInputUi : InputValueUi<List<float>>
 {
-    protected override void DrawReadOnlyControl(string name, ref T list)
+    public override IInputUi Clone()
     {
-        string outputString;
-        if (list == null)
-        {
-            outputString = "NULL";
-        }
-        else
-        {
-            lock (list)
-            {
-                outputString = string.Join(", ", list);
-            }
-        }
-
-        ImGui.TextUnformatted($"{outputString}");
+        return new FloatListInputUi
+                   {
+                       InputDefinition = InputDefinition,
+                       Parent = Parent,
+                       PosOnCanvas = PosOnCanvas,
+                       Relevancy = Relevancy
+                   };
     }
-
-    protected InputEditStateFlags DrawListInputControl<T>(Symbol.Child.Input input, ref List<T> list)
+    
+    protected override InputEditStateFlags DrawEditControl(string name, Symbol.Child.Input input, ref List<float> list, bool readOnly)
     {
         // Handle missing or empty list
         if (list == null)
@@ -38,28 +29,26 @@ internal abstract class ListInputValueUi<T> : InputValueUi<T>
                 list = [];
                 return InputEditStateFlags.Modified | InputEditStateFlags.Finished;
             }
-
             return InputEditStateFlags.Nothing;
         }
 
         if (list.Count == 0)
         {
-            if (ImGui.Button("+"))
+            if(ImGui.Button("+"))
             {
                 if (input.IsDefault)
                 {
                     list = [];
                     input.IsDefault = false;
-                }
-
-                list.Add(default);
+                } 
+                list.Add(0);
                 return InputEditStateFlags.ModifiedAndFinished;
             }
 
             return InputEditStateFlags.Nothing;
         }
-
-        if (ImGui.Button("Clear all"))
+        
+        if(ImGui.Button("Clear all"))
         {
             if (input.IsDefault)
             {
@@ -73,7 +62,7 @@ internal abstract class ListInputValueUi<T> : InputValueUi<T>
 
             return InputEditStateFlags.ModifiedAndFinished;
         }
-
+        
         // List...
         if (!_isDragging && _listOrderWhileDragging.Count != list.Count)
         {
@@ -83,19 +72,19 @@ internal abstract class ListInputValueUi<T> : InputValueUi<T>
                 _listOrderWhileDragging.Add(index);
             }
         }
-
+        
         var cloneIfModified = input.IsDefault;
-
+        
         var modified = InputEditStateFlags.Nothing;
         var completedDragging = false;
         for (var index = 0; index < list.Count; index++)
         {
-            var dragIndex = _isDragging
-                                ? _listOrderWhileDragging[index]
+            var dragIndex = _isDragging ? _listOrderWhileDragging[index]
                                 : index;
             ImGui.PushID(dragIndex);
             ImGui.AlignTextToFramePadding();
-
+            
+            //ImGui.TextUnformatted($"{index}.");
             ImGui.Button($"{dragIndex}.");
 
             if (ImGui.IsItemActive())
@@ -114,7 +103,7 @@ internal abstract class ListInputValueUi<T> : InputValueUi<T>
                 {
                     indexDelta = 1;
                 }
-
+                        
                 if (indexDelta != 0)
                 {
                     if (cloneIfModified)
@@ -128,8 +117,8 @@ internal abstract class ListInputValueUi<T> : InputValueUi<T>
                     if (newIndex >= 0 && index < list.Count && newIndex < list.Count)
                     {
                         (list[newIndex], list[index]) = (list[index], list[newIndex]);
-                        (_listOrderWhileDragging[newIndex], _listOrderWhileDragging[index]) =
-                            (_listOrderWhileDragging[index], _listOrderWhileDragging[newIndex]);
+                        (_listOrderWhileDragging[newIndex], _listOrderWhileDragging[index]) = (_listOrderWhileDragging[index], _listOrderWhileDragging[newIndex]);
+                        
                     }
                 }
             }
@@ -138,40 +127,15 @@ internal abstract class ListInputValueUi<T> : InputValueUi<T>
             {
                 completedDragging = true;
             }
-
+            
             ImGui.SameLine(30 * T3Ui.UiScaleFactor);
-
+            
             var f = list[index];
             var ff = f;
-
-            var size = new Vector2(300 * T3Ui.UiScaleFactor, 0);
-
-            var r = InputEditStateFlags.Nothing;
-            //var r = SingleValueEdit.Draw(ref ff, new Vector2(300 * T3Ui.UiScaleFactor,0));
-
-            switch (ff)
-            {
-                case float floatValue:
-                {
-                    r = SingleValueEdit.Draw(ref floatValue, size);
-                    if (r != InputEditStateFlags.Nothing)
-                    {
-                        ff = (T)(object)floatValue;
-                    }
-
-                    break;
-                }
-                case int intValue:
-                {
-                    r = SingleValueEdit.Draw(ref intValue, size);
-                    if (r != InputEditStateFlags.Nothing)
-                        ff = (T)(object)intValue;
-                    break;
-                }
-            }
-
+            var r = SingleValueEdit.Draw(ref ff, new Vector2(300 * T3Ui.UiScaleFactor,0));
+            
             ImGui.SameLine();
-            if (ImGui.Button("×"))
+            if(ImGui.Button("×"))
             {
                 r |= InputEditStateFlags.ModifiedAndFinished;
                 if (cloneIfModified)
@@ -179,13 +143,12 @@ internal abstract class ListInputValueUi<T> : InputValueUi<T>
                     list = [..list];
                     cloneIfModified = false;
                     input.IsDefault = false;
-                }
-
+                } 
                 list.RemoveAt(index);
             }
-
+            
             ImGui.SameLine();
-            if (ImGui.Button("+"))
+            if(ImGui.Button("+"))
             {
                 r |= InputEditStateFlags.ModifiedAndFinished;
                 if (cloneIfModified)
@@ -193,11 +156,9 @@ internal abstract class ListInputValueUi<T> : InputValueUi<T>
                     list = [..list];
                     cloneIfModified = false;
                     input.IsDefault = false;
-                }
-
+                } 
                 list.Insert(index, ff);
             }
-
             if (r != InputEditStateFlags.Nothing)
             {
                 if (cloneIfModified)
@@ -206,11 +167,9 @@ internal abstract class ListInputValueUi<T> : InputValueUi<T>
                     cloneIfModified = false;
                     input.IsDefault = false;
                 }
-
                 modified |= r;
                 list[index] = ff;
             }
-
             ImGui.PopID();
         }
 
@@ -218,12 +177,45 @@ internal abstract class ListInputValueUi<T> : InputValueUi<T>
         {
             _isDragging = false;
             _listOrderWhileDragging.Clear();
-            modified |= InputEditStateFlags.Modified;
-        }
 
+        }
         return modified;
     }
+    // protected override bool DrawSingleEditControl(string name, ref List<float> list)
+    // {
+    //     if (list == null || list.Count == 0) return false;
+    //     lock (list)
+    //     {
+    //         foreach (var i in list)
+    //         {
+    //             var f = i;
+    //             SingleValueEdit.Draw(ref f, Vector2.Zero);
+    //         }
+    //         string outputString;
+    //         outputString = list == null ? "NULL" :  string.Join(", ", list);
+    //         ImGui.TextUnformatted($"{outputString}");
+    //     }
+    //     return false;
+    // }
 
-    private readonly List<int> _listOrderWhileDragging = [];
-    private bool _isDragging;
+    private static readonly List<int> _listOrderWhileDragging = [];
+    private static bool _isDragging;
+
+    protected override void DrawReadOnlyControl(string name, ref List<float> list)
+    {
+        string outputString;
+        if (list == null)
+        {
+            outputString = "NULL";
+        }
+        else
+        {
+            lock (list)
+            {
+                outputString = string.Join(", ", list);
+            }
+        }
+        
+        ImGui.TextUnformatted($"{outputString}");
+    }
 }

@@ -221,8 +221,7 @@ internal sealed class OscOutput : Instance<OscOutput>, IStatusProvider
 
     protected override void Dispose(bool isDisposing)
     {
-        if (isDisposing && _connected) 
-            _sender.Dispose();
+        if (isDisposing && _connected) _sender.Dispose();
     }
 
     private static bool TryGetValidAddress(string ipAddressString, out string error, out IPAddress ipAddress)
