@@ -1,0 +1,103 @@
+{
+  "Id": "26507fdd-c918-4196-aec5-1a29c7f85157"/*Seamless*/,
+  "Description": "",
+  "InputUis": [
+    {
+      "InputId": "11a795c4-800d-46dd-987c-448c3b7168c7"/*Image*/,
+      "Relevancy": "Required",
+      "Position": {
+        "X": 273.13467,
+        "Y": -194.02914
+      }
+    },
+    {
+      "InputId": "292dbf72-1bb1-4ef2-a322-97a60e345df7"/*TillingMode*/,
+      "Position": {
+        "X": 836.38605,
+        "Y": 301.794
+      }
+    },
+    {
+      "InputId": "58906b39-d294-456e-815e-fc4162ad6884"/*EdgeFallOff*/,
+      "Position": {
+        "X": 274.87515,
+        "Y": -17.41095
+      }
+    }
+  ],
+  "SymbolChildUis": [
+    {
+      "ChildId": "0acf3f4b-64e5-487b-a4d2-9b1939b77795"/*_ImageFxShaderSetupStatic*/,
+      "Style": "Resizable",
+      "Size": {
+        "X": 94.37823,
+        "Y": 258.05994
+      },
+      "Position": {
+        "X": 530.4004,
+        "Y": 54.159195
+      }
+    },
+    {
+      "ChildId": "2725d78e-df4a-4705-bcc3-e4e6c8cd6fb3"/*_ImageFxShaderSetupStatic*/,
+      "Style": "Resizable",
+      "Size": {
+        "X": 94.37823,
+        "Y": 258.05994
+      },
+      "Position": {
+        "X": 626.7971,
+        "Y": -176.3564
+      }
+    },
+    {
+      "ChildId": "3fe93e56-849d-4281-9edd-44c5cc6826fa"/*IntToFloat*/,
+      "Position": {
+        "X": 486.79712,
+        "Y": -106.3564
+      }
+    },
+    {
+      "ChildId": "4084b43a-4a67-44d3-9d2b-149e92d74a85"/*IntToFloat*/,
+      "Position": {
+        "X": 390.4004,
+        "Y": 124.159195
+      }
+    },
+    {
+      "ChildId": "594d69ac-428a-45dd-9ce2-0b74884dfcf4"/*PickTexture*/,
+      "Position": {
+        "X": 1218.2977,
+        "Y": 13.324402
+      }
+    },
+    {
+      "ChildId": "c3b9542b-2653-4e10-a820-5aace52097d2"/*_ImageFxShaderSetupStatic*/,
+      "Style": "Resizable",
+      "Size": {
+        "X": 94.37823,
+        "Y": 258.05994
+      },
+      "Position": {
+        "X": 847.70636,
+        "Y": 113.33618
+      }
+    },
+    {
+      "ChildId": "d4d5e003-2851-4801-aeea-3c87fe5818f7"/*IntToFloat*/,
+      "Position": {
+        "X": 707.70636,
+        "Y": 183.33618
+      }
+    }
+  ],
+  "OutputUis": [
+    {
+      "OutputId": "9f97a957-88d6-4a98-b655-dab9e116647c"/*TextureOutput*/,
+      "Position": {
+        "X": 1390.9093,
+        "Y": 17.475082
+      }
+    }
+  ]
+}
