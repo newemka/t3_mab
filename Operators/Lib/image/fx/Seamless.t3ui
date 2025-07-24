@@ -1,6 +1,6 @@
 {
   "Id": "26507fdd-c918-4196-aec5-1a29c7f85157"/*Seamless*/,
-  "Description": "",
+  "Description": "Makes an incoming image tileable based on smooth step Falloff.\n\nThis can be used to repeat an imported or generated texture infinitely without any obviously visible seams. \n\nAlso see [MakeTileableImageAdvanced] for a version with more options.\nor [MakeTileableImage]",
   "InputUis": [
     {
       "InputId": "11a795c4-800d-46dd-987c-448c3b7168c7"/*Image*/,

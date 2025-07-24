@@ -7,11 +7,11 @@
     },
     {
       "Id": "292dbf72-1bb1-4ef2-a322-97a60e345df7"/*TillingMode*/,
-      "DefaultValue": 0
+      "DefaultValue": 2
     },
     {
       "Id": "58906b39-d294-456e-815e-fc4162ad6884"/*EdgeFallOff*/,
-      "DefaultValue": 0.0
+      "DefaultValue": 0.5
     }
   ],
   "Children": [

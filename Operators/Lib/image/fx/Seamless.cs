@@ -6,6 +6,13 @@ internal sealed class Seamless : Instance<Seamless>
     [Output(Guid = "9f97a957-88d6-4a98-b655-dab9e116647c")]
     public readonly Slot<Texture2D> TextureOutput = new();
 
+    private enum Modes
+    {
+        Horizontal = 0,
+        Vertical = 1,
+        Both = 2,
+        
+    }
 
     [Input(Guid = "11a795c4-800d-46dd-987c-448c3b7168c7")]
     public readonly InputSlot<Texture2D> Image = new();
@@ -13,6 +20,6 @@ internal sealed class Seamless : Instance<Seamless>
         [Input(Guid = "58906b39-d294-456e-815e-fc4162ad6884")]
         public readonly InputSlot<float> EdgeFallOff = new InputSlot<float>();
 
-        [Input(Guid = "292dbf72-1bb1-4ef2-a322-97a60e345df7")]
-        public readonly InputSlot<int> TillingMode = new InputSlot<int>();
+        [Input(Guid = "292dbf72-1bb1-4ef2-a322-97a60e345df7", MappedType = typeof(Modes))]
+    public readonly InputSlot<int> TillingMode = new InputSlot<int>();
 }

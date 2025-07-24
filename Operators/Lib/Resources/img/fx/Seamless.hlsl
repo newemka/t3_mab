@@ -1,7 +1,7 @@
 cbuffer ParamConstants : register(b0)
 {
     float EdgeFallOff;
-    float TillingMode; // 0 = Horizontal only, 1 = Vertical only, 2 = Both
+    float TillingMode; // 0 = Horizontal, 1 = Vertical
 }
 
 cbuffer Resolution : register(b1)
@@ -22,8 +22,6 @@ sampler texSampler : register(s0);
 float4 psMain(vsOutput input) : SV_TARGET
 {
     float4 OriginalColor = Image.Sample(texSampler, input.texCoord);
-  
-    
     // Handle Horizontal Seam (TillingMode 0)
     if (TillingMode == 0 )
     {
@@ -55,7 +53,8 @@ float4 psMain(vsOutput input) : SV_TARGET
     
     }
     // Handle Vertical Seam (TillingMode 1)
-    else{
+    else
+    {
         if (input.texCoord.x < 0.5)
         {
             // Left half - blend with right edge
@@ -81,12 +80,5 @@ float4 psMain(vsOutput input) : SV_TARGET
             OriginalColor = lerp(OriginalColor, leftSample, blendFactor);
         }
     }
-
-
-    
-
-
-  
     return OriginalColor;
-    
 }
