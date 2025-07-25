@@ -1,7 +1,7 @@
 cbuffer ParamConstants : register(b0)
 {
-    float EdgeFallOff;
-    float TillingMode; // 0 = Horizontal, 1 = Vertical
+    float Falloff;
+    float Mode;
 }
 
 cbuffer Resolution : register(b1)
@@ -21,64 +21,25 @@ sampler texSampler : register(s0);
 
 float4 psMain(vsOutput input) : SV_TARGET
 {
-    float4 OriginalColor = Image.Sample(texSampler, input.texCoord);
-    // Handle Horizontal Seam (TillingMode 0)
-    if (TillingMode == 0 )
-    {
-     
-        if (input.texCoord.y < 0.5)
-        {
-            // Top half - blend with bottom edge
-            float2 bottomCoord = float2(input.texCoord.x, input.texCoord.y + 0.5);
-            float4 bottomSample = Image.Sample(texSampler, bottomCoord);
-            
-            // Blend factor: 1 at y=0, 0 at y=0.5
-            float blendFactor = 1.0 - (input.texCoord.y * 2.0);
-            blendFactor = smoothstep(0.0, EdgeFallOff, blendFactor);
-            
-            OriginalColor = lerp(OriginalColor, bottomSample, blendFactor);
-        }
-        else
-        {
-            // Bottom half - blend with top edge
-            float2 topCoord = float2(input.texCoord.x, input.texCoord.y - 0.5);
-            float4 topSample = Image.Sample(texSampler, topCoord);
-            
-            // Blend factor: 0 at y=0.5, 1 at y=1.0
-            float blendFactor = (input.texCoord.y - 0.5) * 2.0;
-            blendFactor = smoothstep(0.0, EdgeFallOff, blendFactor);
-            
-            OriginalColor = lerp(OriginalColor, topSample, blendFactor);
-        }
-    
+    float width, height;
+    Image.GetDimensions(width, height);
+
+    float2 uv = input.texCoord;
+    float4 Base = Image.Sample(texSampler, uv);
+
+    float direction = uv.x;
+    float2 shiftedUV = float2(uv.x + 0.5, uv.y); 
+
+    if (Mode < 0.5) {
+         shiftedUV = float2(uv.x, uv.y + 0.5);
+         direction = uv.y;
     }
-    // Handle Vertical Seam (TillingMode 1)
-    else
-    {
-        if (input.texCoord.x < 0.5)
-        {
-            // Left half - blend with right edge
-            float2 rightCoord = float2(input.texCoord.x + 0.5, input.texCoord.y);
-            float4 rightSample = Image.Sample(texSampler, rightCoord);
-            
-            // Blend factor: 1 at x=0, 0 at x=0.5
-            float blendFactor = 1.0 - (input.texCoord.x * 2.0);
-            blendFactor = smoothstep(0.0, EdgeFallOff, blendFactor);
-            
-            OriginalColor = lerp(OriginalColor, rightSample, blendFactor);
-        }
-        else
-        {
-            // Right half - blend with left edge
-            float2 leftCoord = float2(input.texCoord.x - 0.5, input.texCoord.y);
-            float4 leftSample = Image.Sample(texSampler, leftCoord);
-            
-            // Blend factor: 0 at x=0.5, 1 at x=1.0
-            float blendFactor = (input.texCoord.x - 0.5) * 2.0;
-            blendFactor = smoothstep(0.0, EdgeFallOff, blendFactor);
-            
-            OriginalColor = lerp(OriginalColor, leftSample, blendFactor);
-        }
-    }
-    return OriginalColor;
+
+    float4 seamSample = Image.Sample(texSampler, shiftedUV);
+
+    float blendFactor = abs(1.0 - (direction * 2.0)) ;  
+    blendFactor = smoothstep(0.0, Falloff, blendFactor);
+  
+   return lerp(Base,seamSample,blendFactor);
+
 }
