@@ -24,4 +24,16 @@ internal sealed class OrientPoints : Instance<OrientPoints>
 
     [Input(Guid = "02ae76ba-7be8-4112-a59b-55616343f1dd")]
     public readonly InputSlot<bool> Flip = new();
+
+        [Input(Guid = "2f61aa1d-fb5e-478e-9f20-3515c9273705")]
+        public readonly InputSlot<int> Mode = new InputSlot<int>();
+
+        [Input(Guid = "8447b489-0605-45e3-b195-fbd313671b38")]
+        public readonly InputSlot<float> BaseScale = new InputSlot<float>();
+
+        [Input(Guid = "6b681140-bf8e-4751-b39b-b6b278b7a694")]
+        public readonly InputSlot<int> ScaleMode = new InputSlot<int>();
+
+        [Input(Guid = "259fe1fb-fb9b-4bbc-8c4b-babe307c385e")]
+        public readonly InputSlot<float> Fov = new InputSlot<float>();
 }

@@ -11,10 +11,24 @@
       }
     },
     {
+      "InputId": "259fe1fb-fb9b-4bbc-8c4b-babe307c385e"/*Fov*/,
+      "Position": {
+        "X": -475.48764,
+        "Y": 1385.9227
+      }
+    },
+    {
       "InputId": "2aa74709-65f3-49fa-9890-f0a0f6e76bbf"/*UpVector*/,
       "Position": {
         "X": -475.48764,
         "Y": 973.9226
+      }
+    },
+    {
+      "InputId": "2f61aa1d-fb5e-478e-9f20-3515c9273705"/*Mode*/,
+      "Position": {
+        "X": -475.48764,
+        "Y": 1160.9227
       }
     },
     {
@@ -40,6 +54,20 @@
         "Y": 856.5001
       },
       "AddPadding": "True"
+    },
+    {
+      "InputId": "6b681140-bf8e-4751-b39b-b6b278b7a694"/*ScaleMode*/,
+      "Position": {
+        "X": -475.48764,
+        "Y": 1310.9227
+      }
+    },
+    {
+      "InputId": "8447b489-0605-45e3-b195-fbd313671b38"/*BaseScale*/,
+      "Position": {
+        "X": -475.48764,
+        "Y": 1235.9227
+      }
     },
     {
       "InputId": "865ad090-0fdd-4683-ba93-b6be92b55cb3"/*Points*/,
@@ -87,6 +115,13 @@
       }
     },
     {
+      "ChildId": "7848dffe-98d0-4130-a513-3a69cb4c8498"/*TransformsConstBuffer*/,
+      "Position": {
+        "X": 187.45499,
+        "Y": 1103.9224
+      }
+    },
+    {
       "ChildId": "8666fc66-a454-472f-9008-57f2034675dc"/*GetBufferComponents*/,
       "Position": {
         "X": -338.51422,
@@ -101,10 +136,24 @@
       }
     },
     {
+      "ChildId": "a14d899b-1342-45ab-ad3b-fc4461fe887a"/*IntToFloat*/,
+      "Position": {
+        "X": -303.73795,
+        "Y": 1178.4421
+      }
+    },
+    {
       "ChildId": "a8a59c58-9cfa-4dbb-9a5d-225699b778df"/*Vector3Components*/,
       "Position": {
         "X": -312.2176,
         "Y": 990.64294
+      }
+    },
+    {
+      "ChildId": "c4af4b04-42a3-45ef-b9fd-e07b7b5bf705"/*IntToFloat*/,
+      "Position": {
+        "X": -296.86743,
+        "Y": 1332.8389
       }
     },
     {
@@ -143,8 +192,8 @@
         "Y": 302.01947
       },
       "Position": {
-        "X": 180.66774,
-        "Y": 799.3652
+        "X": 186.24855,
+        "Y": 701.14264
       }
     }
   ],

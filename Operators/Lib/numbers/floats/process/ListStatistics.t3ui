@@ -1,0 +1,30 @@
+{
+  "Id": "0be17d51-f2d0-46d1-ac8f-caf2348c2f10"/*ListStatistics*/,
+  "Description": "Gives the Sum, Max, Min, Mean and Median of a float list",
+  "InputUis": [
+    {
+      "InputId": "21eb8bd5-fe93-4f6f-8d31-78770e82d271"/*Input*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "InputId": "bcbe1f13-c169-4eae-b1fe-b6e1c648737a"/*Operation*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 45.0
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "ba2b2386-c9cb-4f5b-af61-83f877aa9e72"/*Result*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 0.0
+      }
+    }
+  ]
+}
