@@ -214,6 +214,12 @@
       "Outputs": []
     },
     {
+      "Id": "6ee790d1-db8e-4a95-b828-412cdd3c35ed"/*GeometryShaderStage*/,
+      "SymbolId": "4abd5f2e-3296-4d71-8462-faa203091b1d",
+      "InputValues": [],
+      "Outputs": []
+    },
+    {
       "Id": "818d5323-00f1-45d9-b88f-6991ba26fb81"/*MultiplyInt*/,
       "SymbolId": "6a4edb6a-5ced-4356-9090-4bf770cdeb52",
       "InputValues": [
@@ -267,6 +273,18 @@
           "Id": "eeb75a91-2402-44be-bb9d-b620e34085ed"/*AntialiasedLineEnabled*/,
           "Type": "System.Boolean",
           "Value": true
+        }
+      ],
+      "Outputs": []
+    },
+    {
+      "Id": "95ab2184-5c61-465d-8a7b-09d4c4c81bf0"/*GeometryShader*/,
+      "SymbolId": "a908cc64-e8cb-490c-ae45-c2c5fbfcedfb",
+      "InputValues": [
+        {
+          "Id": "258c53e6-7708-49b7-88e2-1e40d2a4f88d"/*Source*/,
+          "Type": "System.String",
+          "Value": "Resources/lib/3d/mesh/mesh-Draw.hlsl"
         }
       ],
       "Outputs": []
@@ -443,6 +461,12 @@
       "TargetSlotId": "5d73ebe6-9aa0-471a-ae6b-3f5bfd5a0f9c"
     },
     {
+      "SourceParentOrChildId": "6ee790d1-db8e-4a95-b828-412cdd3c35ed",
+      "SourceSlotId": "07198b7f-62bc-400e-9e7f-848460b96e38",
+      "TargetParentOrChildId": "1ac59a27-5de5-43c3-a308-320cab00aa65",
+      "TargetSlotId": "5d73ebe6-9aa0-471a-ae6b-3f5bfd5a0f9c"
+    },
+    {
       "SourceParentOrChildId": "69767494-70bc-4ac8-aa51-a552037edf79",
       "SourceSlotId": "805e271d-b9c5-45a2-9040-f30c68b06ea6",
       "TargetParentOrChildId": "1ac59a27-5de5-43c3-a308-320cab00aa65",
@@ -591,6 +615,12 @@
       "SourceSlotId": "adf247cd-79cc-4d4e-b3c1-6a8b2d54683d",
       "TargetParentOrChildId": "69767494-70bc-4ac8-aa51-a552037edf79",
       "TargetSlotId": "cc866663-5bfa-4a17-9efc-e2f381767317"
+    },
+    {
+      "SourceParentOrChildId": "95ab2184-5c61-465d-8a7b-09d4c4c81bf0",
+      "SourceSlotId": "85b65c27-d5b3-4fe1-88af-b1f6abaa4515",
+      "TargetParentOrChildId": "6ee790d1-db8e-4a95-b828-412cdd3c35ed",
+      "TargetSlotId": "2a217f9d-2f9f-418a-8568-f767905384d5"
     },
     {
       "SourceParentOrChildId": "acf51f9f-7cbb-40a2-86c4-fc5e215f774c",

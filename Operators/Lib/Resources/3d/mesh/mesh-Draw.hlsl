@@ -52,6 +52,16 @@ cbuffer Params : register(b5)
     /*{FLOAT_PARAMS}*/
 }
 
+struct vsOutput
+{
+    float2 texCoord : TEXCOORD;
+    float4 pixelPosition : SV_POSITION;
+    float3 worldPosition : POSITION;
+    float3x3 tbnToWorld : TBASIS;
+    float fog : VPOS;
+    float3 faceNormal : FACE_NORMAL; // Add this for flat shading
+};
+
 struct psInput
 {
     float2 texCoord : TEXCOORD;
@@ -59,6 +69,7 @@ struct psInput
     float3 worldPosition : POSITION;
     float3x3 tbnToWorld : TBASIS;
     float fog : VPOS;
+    float3 flatNormal : FACE_NORMAL; // Add flat normal from geometry shader
 };
 
 sampler WrappedSampler : register(s0);
@@ -76,9 +87,9 @@ Texture2D<float4> NormalMap : register(t5);
 TextureCube<float4> PrefilteredSpecular : register(t6);
 Texture2D<float4> BRDFLookup : register(t7);
 
-psInput vsMain(uint id : SV_VertexID)
+vsOutput vsMain(uint id : SV_VertexID)
 {
-    psInput output;
+    vsOutput output;
 
     int faceIndex = id / 3; //  (id % verticesPerInstance) / 3;
     int faceVertexIndex = id % 3;
@@ -112,7 +123,39 @@ psInput vsMain(uint id : SV_VertexID)
         output.fog = fog;
     }
 
+    // Store the original normal for potential use
+    output.faceNormal = mul(vertex.Normal, (float3x3)ObjectToWorld);
+
     return output;
+}
+
+[maxvertexcount(3)]
+void gsMain(triangle vsOutput input[3], inout TriangleStream<psInput> output)
+{
+    // Calculate flat normal for the entire triangle
+    float3 p0 = input[0].worldPosition;
+    float3 p1 = input[1].worldPosition;
+    float3 p2 = input[2].worldPosition;
+    
+    float3 edge1 = p1 - p0;
+    float3 edge2 = p2 - p0;
+    float3 flatNormal = normalize(cross(edge1, edge2));
+    
+    // Pass the same flat normal to all vertices of the triangle
+    for (int i = 0; i < 3; i++)
+    {
+        psInput element;
+        element.texCoord = input[i].texCoord;
+        element.pixelPosition = input[i].pixelPosition;
+        element.worldPosition = input[i].worldPosition;
+        element.tbnToWorld = input[i].tbnToWorld;
+        element.fog = input[i].fog;
+        element.flatNormal = flatNormal; // Pass the computed flat normal
+        
+        output.Append(element);
+    }
+    
+    output.RestartStrip();
 }
 
 //=== Global functions ==============================================
@@ -151,28 +194,25 @@ float3 ComputeNormal(psInput pin, float3x3 tbnToWorld)
     float3 N;
     if (UseFlatShading > 0.5)
     {
-        // Flat shading: calculate geometric normal from world position derivatives
-        float3 dpdx = ddx(frag.worldPosition);
-        float3 dpdy = ddy(frag.worldPosition);
-        float3 geometricNormal = normalize(cross(dpdy, dpdx));
-
-        // Apply normal map details on top of flat normal
-        float4 normalMap = NormalMap.Sample(WrappedSampler, frag.uv);
+        // Use the flat normal from geometry shader
+        N = normalize(pin.flatNormal);
+        
+        // Optionally apply normal map details (though this may reduce the "flat" look)
+        float4 normalMap = NormalMap.Sample(WrappedSampler, pin.texCoord);
         float3 normalDetail = normalize(2.0 * normalMap.rgb - 1.0);
-
-        // Create TBN basis using geometric normal and derivatives
-        float3 T = normalize(dpdx);
-        float3 B = normalize(cross(geometricNormal, T));
-        T = cross(B, geometricNormal); // Reorthogonalize
-        float3x3 flatTBN = float3x3(T, B, geometricNormal);
-
-        // Apply normal map in flat shading tangent space
+        
+        // Create a simple TBN using the flat normal
+        float3 T = normalize(ddx(pin.worldPosition));
+        float3 B = normalize(cross(N, T));
+        float3x3 flatTBN = float3x3(T, B, N);
+        
+        // Apply normal map if desired
         N = normalize(mul(normalDetail, flatTBN));
     }
     else
     {
-        // Standard shading: use interpolated normals with normal mapping
-        float4 normalMap = NormalMap.Sample(WrappedSampler, frag.uv);
+        // Standard shading
+        float4 normalMap = NormalMap.Sample(WrappedSampler, pin.texCoord);
         N = normalize(2.0 * normalMap.rgb - 1.0);
         N = normalize(mul(N, tbnToWorld));
     }
