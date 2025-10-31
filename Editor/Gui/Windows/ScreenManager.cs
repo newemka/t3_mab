@@ -198,7 +198,7 @@ internal sealed class ScreenManager : Window
         );
 
         // Draw the spanning area rectangle
-        drawList.AddRect(rectMin, rectMax, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 0, 0, 1)), 8.0f);
+        drawList.AddRect(rectMin, rectMax, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 0, 0, 1)), 0, ImDrawFlags.RoundCornersNone, 4);
 
         // Set cursor position to continue after the visualization
         ImGui.SetCursorScreenPos(canvasEndPos);
