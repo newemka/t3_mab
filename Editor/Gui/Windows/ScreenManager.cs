@@ -1,19 +1,9 @@
 using ImGuiNET;
 using System.Drawing;
-using System.IO;
-using System.Text.RegularExpressions;
-using System.Windows.Forms; // Add this namespace
-using T3.Core.Animation;
-using T3.Core.Audio;
-using T3.Core.DataTypes;
-using T3.Core.DataTypes.Vector;
-using T3.Core.UserData;
+using System.Windows.Forms;
 using T3.Core.Utils;
 using T3.Editor.Gui.Input;
-using T3.Editor.Gui.Interaction;
-using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
-using T3.Editor.UiModel.ProjectHandling;
 using Vector2 = System.Numerics.Vector2;
 
 namespace T3.Editor.Gui.Windows;
@@ -54,7 +44,7 @@ internal sealed class ScreenManager : Window
                     ImGui.BulletText($"Device Name: {screen.DeviceName}");
                     ImGui.BulletText($"Primary: {screen.Primary}");
                     ImGui.BulletText($"Bounds: {screen.Bounds}");
-                    ImGui.BulletText($"Working Area: {screen.WorkingArea}");
+                    //ImGui.BulletText($"Working Area: {screen.WorkingArea}");
                     ImGui.BulletText($"Bits Per Pixel: {screen.BitsPerPixel}");
 
                     ImGui.TreePop();
@@ -89,36 +79,8 @@ internal sealed class ScreenManager : Window
         // Reserve space for the canvas first
         ImGui.InvisibleButton("screen_layout_canvas", new Vector2(overallBounds.Width * scale, overallBounds.Height * scale));
         var canvasEndPos = ImGui.GetCursorScreenPos();
-
-        // First draw all the screen rectangles and labels
-        foreach (var screen in screens)
-        {
-            var bounds = screen.Bounds;
-            var screenIndex = Array.IndexOf(screens, screen);
-
-            // Calculate scaled position and size relative to overall bounds
-            var x = canvasPos.X + centerOffsetX + (bounds.X - overallBounds.X) * scale;
-            var y = canvasPos.Y + (bounds.Y - overallBounds.Y) * scale;
-            var width = bounds.Width * scale;
-            var height = bounds.Height * scale;
-
-            // Draw screen rectangle
-            var color = screen.Primary ? new Vector4(0.2f, 0.8f, 0.2f, 1.0f) : new Vector4(0.2f, 0.5f, 0.8f, 1.0f);
-            drawList.AddRectFilled(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(color));
-
-            // Draw border
-            drawList.AddRect(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)));
-
-            // Draw screen label
-            var label = $"Screen {screenIndex + 1}";
-            if (screen.Primary)
-                label += " (Primary)";
-
-            var textSize = ImGui.CalcTextSize(label);
-            var textPos = new Vector2(x + (width - textSize.X) * 0.5f, y + (height - textSize.Y) * 0.5f);
-            drawList.AddText(textPos, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), label);
-        }
-
+     
+        
 
         ImGui.SetCursorScreenPos(canvasPos + new Vector2(centerOffsetX, 0));
 
@@ -153,7 +115,7 @@ internal sealed class ScreenManager : Window
                 ImGui.PopID();
 
                 // Position the checkbox in top-right corner relative to the child window
-                ImGui.SetCursorPos(new Vector2(x + width - 30, y + 5));
+                ImGui.SetCursorPos(new Vector2(x + width - 30 * T3Ui.UiScaleFactor, y + 5));
 
                 ImGui.PushID($"screen_span_{screenIndex}");
 
@@ -181,9 +143,62 @@ internal sealed class ScreenManager : Window
                     ImGui.SetTooltip($"Include Screen {screenIndex + 1} in spanning area");
                 }
                 ImGui.PopID();
+
+                
             }
         }
         ImGui.EndChild();
+
+        // First draw all the screen rectangles and labels
+        foreach (var screen in screens)
+        {
+            var bounds = screen.Bounds;
+            var screenIndex = Array.IndexOf(screens, screen);
+
+            // Calculate scaled position and size relative to overall bounds
+            var x = canvasPos.X + centerOffsetX + (bounds.X - overallBounds.X) * scale;
+            var y = canvasPos.Y + (bounds.Y - overallBounds.Y) * scale;
+            var width = bounds.Width * scale;
+            var height = bounds.Height * scale;
+
+            // Draw screen rectangle
+            var color = screen.Primary ? new Vector4(0.2f, 0.8f, 0.2f, 1.0f) : new Vector4(0.2f, 0.5f, 0.8f, 1.0f);
+            drawList.AddRectFilled(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(color));
+
+            // Draw border
+            drawList.AddRect(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)));
+
+            // Draw screen label
+            var label = $"Screen {screenIndex + 1}";
+            if (screen.Primary)
+                label += " (Primary)";
+
+            var textSize = ImGui.CalcTextSize(label);
+            var textPos = new Vector2(x + (width - textSize.X) * 0.5f, y + (height - textSize.Y) * 0.5f);
+            drawList.AddText(textPos, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), label);
+        }
+
+        // Calculate the scaled spanning area relative to overall bounds
+        var scaledSpanning = new Vector4(
+            (UserSettings.Config.Rectangle.X - overallBounds.X) * scale,
+            (UserSettings.Config.Rectangle.Y - overallBounds.Y) * scale,
+            UserSettings.Config.Rectangle.Z * scale,
+            UserSettings.Config.Rectangle.W * scale
+        );
+
+        // Calculate the position on the canvas
+        var rectMin = new Vector2(
+            canvasPos.X + centerOffsetX + scaledSpanning.X,
+            canvasPos.Y + scaledSpanning.Y
+        );
+
+        var rectMax = new Vector2(
+            rectMin.X + scaledSpanning.Z,
+            rectMin.Y + scaledSpanning.W
+        );
+
+        // Draw the spanning area rectangle
+        drawList.AddRect(rectMin, rectMax, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 0, 0, 1)), 8.0f);
 
         // Set cursor position to continue after the visualization
         ImGui.SetCursorScreenPos(canvasEndPos);
@@ -282,7 +297,7 @@ internal sealed class ScreenManager : Window
 
     private static void ClearSpanningSelection()
     {
-        UserSettings.Config.Rectangle = new Vector4(0, 0, 0, 0);
+        UserSettings.Config.Rectangle = new Vector4(1920, 0, 640, 360);
     }
 
     private static Rectangle GetOverallScreenBounds(Screen[] screens)
@@ -297,6 +312,4 @@ internal sealed class ScreenManager : Window
 
         return new Rectangle(minX, minY, maxX - minX, maxY - minY);
     }
-
-   
 }
