@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -85,13 +85,21 @@ internal sealed class AppWindow
         return dpi;
     }
 
-    internal void SetFullScreen(int screenIndex)
+    internal void SetFullScreen(int screenIndex, bool spanover)
     {
         _boundsBeforeFullscreen = Form.Bounds;
         Form.FormBorderStyle = FormBorderStyle.Sizable;
         Form.WindowState = FormWindowState.Normal;
         Form.FormBorderStyle = FormBorderStyle.None;
-        Form.Bounds = Screen.AllScreens[screenIndex].Bounds;
+        if (!spanover)
+        {
+            Form.Bounds = Screen.AllScreens[screenIndex].Bounds;
+        }
+        else
+        {
+            Form.Bounds = new Rectangle(1920, 0, 3840, 1080);
+        }
+        
     }
 
     internal void InitViewSwapChain(Factory factory)

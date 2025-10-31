@@ -44,7 +44,8 @@ internal static partial class WindowManager
 
     internal static readonly SettingsWindow SettingsWindow = new();
     internal static readonly UtilitiesWindow UtilitiesWindow = new();
-    
+    internal static readonly ScreenManager ScreenManager = new();
+
 
     private static void TryToInitialize()
     {
@@ -66,6 +67,7 @@ internal static partial class WindowManager
                 Program.ConsoleLogWindow,
                 UtilitiesWindow,    // item shown in TiXL > Development menu
                 SettingsWindow, // item shown in TiXL menu
+                ScreenManager,
             ];
 
 

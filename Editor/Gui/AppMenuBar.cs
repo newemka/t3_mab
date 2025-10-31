@@ -387,7 +387,7 @@ internal static class AppMenuBar
             ImGui.Separator();
             ImGui.MenuItem("Fullscreen", UserActions.ToggleFullscreen.ListShortcuts(), ref UserSettings.Config.FullScreen);
 
-            var screens = EditorUi.Instance.AllScreens;
+           /* var screens = EditorUi.Instance.AllScreens;
             if (ImGui.BeginMenu("Fullscreen Display"))
             {
                 for (var index = 0; index < screens.Count; index++)
@@ -402,7 +402,7 @@ internal static class AppMenuBar
                 }
 
                 ImGui.EndMenu();
-            }
+            }*/
 
             ImGui.Separator();
 
