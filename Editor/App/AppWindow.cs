@@ -16,6 +16,7 @@ using Icon = System.Drawing.Icon;
 using Rectangle = System.Drawing.Rectangle;
 using Resource = SharpDX.Direct3D11.Resource;
 using Vector2 = System.Numerics.Vector2;
+using Vector4 = System.Numerics.Vector4;
 
 namespace T3.Editor.App;
 
@@ -85,7 +86,7 @@ internal sealed class AppWindow
         return dpi;
     }
 
-    internal void SetFullScreen(int screenIndex, bool spanover)
+    internal void SetFullScreen(int screenIndex, bool spanover, Vector4 spanning)
     {
         _boundsBeforeFullscreen = Form.Bounds;
         Form.FormBorderStyle = FormBorderStyle.Sizable;
@@ -97,7 +98,9 @@ internal sealed class AppWindow
         }
         else
         {
-            Form.Bounds = new Rectangle(1920, 0, 3840, 1080);
+            //Form.Bounds = new Rectangle(1920, 0, 3840, 1080);
+            
+            Form.Bounds = new Rectangle((int)spanning.X, (int)spanning.Y, (int)spanning.Z, (int)spanning.W);
         }
         
     }

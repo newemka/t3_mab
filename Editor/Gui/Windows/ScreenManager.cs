@@ -38,7 +38,7 @@ internal sealed class ScreenManager : Window
         throw new NotImplementedException();
     }
 
-    private void DrawInnerContent()
+    private static void DrawInnerContent()
     {
         if (ImGui.CollapsingHeader("Available Screens", ImGuiTreeNodeFlags.DefaultOpen))
         {
@@ -119,8 +119,8 @@ internal sealed class ScreenManager : Window
             drawList.AddText(textPos, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), label);
         }
 
-        
-        ImGui.SetCursorScreenPos(canvasPos + new Vector2(centerOffsetX,0));
+
+        ImGui.SetCursorScreenPos(canvasPos + new Vector2(centerOffsetX, 0));
 
         // Create a child window for the interactive elements to ensure proper hit testing
         ImGui.BeginChild("Editor screen selection", new Vector2(overallBounds.Width * scale, overallBounds.Height * scale));
@@ -151,6 +151,36 @@ internal sealed class ScreenManager : Window
                     ImGui.SetTooltip($"Set Screen {screenIndex + 1} as fullscreen display for Main window");
                 }
                 ImGui.PopID();
+
+                // Position the checkbox in top-right corner relative to the child window
+                ImGui.SetCursorPos(new Vector2(x + width - 30, y + 5));
+
+                ImGui.PushID($"screen_span_{screenIndex}");
+
+                // Check if this screen is currently in the spanning area
+                var isPartOfSpanning = IsScreenInSpanningArea(screen, UserSettings.Config.Rectangle);
+                var wasPartOfSpanning = isPartOfSpanning; // Store original value
+
+                if (ImGui.Checkbox("", ref isPartOfSpanning))
+                {
+                    // Checkbox was toggled
+                    if (isPartOfSpanning && !wasPartOfSpanning)
+                    {
+                        // Checkbox was checked - add screen to spanning
+                        AddScreenToSpanning(screen, screens);
+                    }
+                    else if (!isPartOfSpanning && wasPartOfSpanning)
+                    {
+                        // Checkbox was unchecked - remove screen from spanning
+                        RemoveScreenFromSpanning(screen, screens);
+                    }
+                }
+
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip($"Include Screen {screenIndex + 1} in spanning area");
+                }
+                ImGui.PopID();
             }
         }
         ImGui.EndChild();
@@ -166,6 +196,11 @@ internal sealed class ScreenManager : Window
 
         ImGui.Checkbox("Enable fullscreen", ref UserSettings.Config.FullScreen);
 
+        // Display spanning information
+        var spanningBounds = UserSettings.Config.Rectangle;
+        ImGui.Text($"Spanning area: X={spanningBounds.X:0} Y={spanningBounds.Y:0} " +
+                   $"Width={spanningBounds.Z:0} Height={spanningBounds.W:0}");
+
         // Add a button to reset to primary screen
         if (ImGui.Button("Reset to Primary Screen"))
         {
@@ -175,6 +210,79 @@ internal sealed class ScreenManager : Window
                 UserSettings.Config.FullScreenIndexMain = primaryScreenIndex;
             }
         }
+
+        // Add a button to clear all spanning selections
+        ImGui.SameLine();
+        if (ImGui.Button("Clear Spanning Selection"))
+        {
+            ClearSpanningSelection();
+        }
+    }
+
+    private static bool IsScreenInSpanningArea(Screen screen, Vector4 spanningArea)
+    {
+        if (spanningArea.Z == 0 || spanningArea.W == 0) // No spanning area defined
+            return false;
+
+        var screenBounds = screen.Bounds;
+
+        // Check if the screen's bounds are completely within the spanning area
+        // or if they significantly overlap (you can adjust this logic as needed)
+        return screenBounds.Left >= spanningArea.X &&
+               screenBounds.Right <= spanningArea.X + spanningArea.Z &&
+               screenBounds.Top >= spanningArea.Y &&
+               screenBounds.Bottom <= spanningArea.Y + spanningArea.W;
+    }
+
+    private static void AddScreenToSpanning(Screen screen, Screen[] screens)
+    {
+        var currentBounds = UserSettings.Config.Rectangle;
+        var screenBounds = screen.Bounds;
+
+        // Get all screens that are currently in the spanning area
+        var currentScreens = screens.Where(s => IsScreenInSpanningArea(s, currentBounds)).ToList();
+
+        // Add the new screen
+        if (!currentScreens.Contains(screen))
+            currentScreens.Add(screen);
+
+        // Calculate new combined bounds
+        UpdateSpanningBounds(currentScreens.ToArray());
+    }
+
+    private static void RemoveScreenFromSpanning(Screen screen, Screen[] screens)
+    {
+        var currentBounds = UserSettings.Config.Rectangle;
+
+        // Get all screens that are currently in the spanning area, excluding the one to remove
+        var remainingScreens = screens.Where(s => IsScreenInSpanningArea(s, currentBounds) && s != screen).ToArray();
+
+        // Update bounds with remaining screens
+        UpdateSpanningBounds(remainingScreens);
+    }
+
+    private static void UpdateSpanningBounds(Screen[] selectedScreens)
+    {
+        if (selectedScreens.Length == 0)
+        {
+            UserSettings.Config.Rectangle = new Vector4(0, 0, 0, 0);
+            return;
+        }
+
+        var minX = selectedScreens.Min(s => s.Bounds.X);
+        var minY = selectedScreens.Min(s => s.Bounds.Y);
+        var maxX = selectedScreens.Max(s => s.Bounds.Right);
+        var maxY = selectedScreens.Max(s => s.Bounds.Bottom);
+
+        UserSettings.Config.Rectangle = new Vector4(
+            minX, minY,
+            maxX - minX, maxY - minY
+        );
+    }
+
+    private static void ClearSpanningSelection()
+    {
+        UserSettings.Config.Rectangle = new Vector4(0, 0, 0, 0);
     }
 
     private static Rectangle GetOverallScreenBounds(Screen[] screens)
@@ -189,4 +297,6 @@ internal sealed class ScreenManager : Window
 
         return new Rectangle(minX, minY, maxX - minX, maxY - minY);
     }
+
+   
 }

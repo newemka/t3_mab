@@ -118,6 +118,7 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
         public float GizmoSize = 100;
         public int FullScreenIndexMain = 0;
         public int FullScreenIndexViewer = 0;
+        public Vector4 Rectangle = new(1920,0,1280,720);
 
         // Timeline
         public float TimeRasterDensity = 1f;

@@ -13,6 +13,7 @@ using T3.Editor.UiModel;
 using Device = SharpDX.Direct3D11.Device;
 using PixelShader = T3.Core.DataTypes.PixelShader;
 using VertexShader = T3.Core.DataTypes.VertexShader;
+using Vector4 = System.Numerics.Vector4;
 
 namespace T3.Editor.App;
 
@@ -48,8 +49,8 @@ internal static class ProgramWindows
         if (UserSettings.Config.FullScreen)
         {
             var screenCount = Screen.AllScreens.Length;
-            Main.SetFullScreen(UserSettings.Config.FullScreenIndexMain < screenCount ? UserSettings.Config.FullScreenIndexMain : 0, false);
-            Viewer.SetFullScreen(UserSettings.Config.FullScreenIndexViewer < screenCount ? UserSettings.Config.FullScreenIndexViewer : 0, true);
+            Main.SetFullScreen(UserSettings.Config.FullScreenIndexMain < screenCount ? UserSettings.Config.FullScreenIndexMain : 0, false, Vector4.One);
+            Viewer.SetFullScreen(UserSettings.Config.FullScreenIndexViewer < screenCount ? UserSettings.Config.FullScreenIndexViewer : 0, true, UserSettings.Config.Rectangle);
         }
         else
         {
