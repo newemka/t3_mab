@@ -134,7 +134,7 @@ internal static partial class WindowManager
         LayoutHandling.UpdateAfterResize(newSize);
     }
 
-    private static void ToggleWindowTypeVisibility<T>() where T : Window
+    public static void ToggleWindowTypeVisibility<T>() where T : Window
     {
         var instances = GetAllWindows().OfType<T>().ToList();
         if (instances.Count != 1)
@@ -153,6 +153,6 @@ internal static partial class WindowManager
     /// </summary>
     private static List<Window> _windows = [];
     
-    public static bool ShowSecondaryRenderWindow { get; private set; }
+    public static bool ShowSecondaryRenderWindow { get; set; }
     private static bool _hasBeenInitialized;
 }

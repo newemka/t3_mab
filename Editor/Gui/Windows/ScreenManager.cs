@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using T3.Core.Utils;
 using T3.Editor.Gui.Input;
 using T3.Editor.Gui.UiHelpers;
+using T3.Editor.Gui.Windows.Layouts;
 using Vector2 = System.Numerics.Vector2;
 
 namespace T3.Editor.Gui.Windows;
@@ -30,9 +31,10 @@ internal sealed class ScreenManager : Window
 
     private static void DrawInnerContent()
     {
+        var screens = Screen.AllScreens;
         if (ImGui.CollapsingHeader("Available Screens", ImGuiTreeNodeFlags.DefaultOpen))
         {
-            var screens = Screen.AllScreens;
+            
 
             // Display screen information in tree nodes
             for (var i = 0; i < screens.Length; i++)
@@ -44,7 +46,7 @@ internal sealed class ScreenManager : Window
                     ImGui.BulletText($"Device Name: {screen.DeviceName}");
                     ImGui.BulletText($"Primary: {screen.Primary}");
                     ImGui.BulletText($"Bounds: {screen.Bounds}");
-                    //ImGui.BulletText($"Working Area: {screen.WorkingArea}");
+                    //ImGui.BulletText($"Working Area: {screen.WorkingArea}"); // On Windows, this is the area excluding taskbars/docks
                     ImGui.BulletText($"Bits Per Pixel: {screen.BitsPerPixel}");
 
                     ImGui.TreePop();
@@ -54,38 +56,62 @@ internal sealed class ScreenManager : Window
             }
 
             ImGui.Text($"Total screens detected: {screens.Length}");
-
-            // Draw visual screen layout
-            FormInputs.AddVerticalSpace(10);
-            if (ImGui.CollapsingHeader("Screen Layout Visualization", ImGuiTreeNodeFlags.DefaultOpen))
+           
+           
+        }
+        // Draw visual screen layout
+        FormInputs.AddVerticalSpace(10);
+        if (ImGui.CollapsingHeader("Screen Layout Visualization", ImGuiTreeNodeFlags.DefaultOpen))
+        {
+            ImGui.Text("You need to enable the 2nd output window.");
+            var secondOutput = WindowManager.ShowSecondaryRenderWindow;
+            if (ImGui.Checkbox("Enable 2nd Output Window", ref secondOutput))
             {
-                DrawScreenLayout(screens);
+                WindowManager.ShowSecondaryRenderWindow = secondOutput;
             }
+            DrawScreenLayout(screens);
         }
     }
 
     private static void DrawScreenLayout(Screen[] screens)
-    {
-        var scale = 0.1f * T3Ui.UiScaleFactor;
+    {   // This is all what we have to do in oder to make the screen layout responsive
+        // var windowWidth = ImGui.GetContentRegionAvail().X; // This would be the available width, but when the scollbar appears it makes problems
+        var windowWidth = ImGui.GetWindowWidth()-12; // A bit of a hack to avoid scrollbar issues, 12 pixels is the width of the scrollbar. 
+        var baseScale = 0.1f * T3Ui.UiScaleFactor;
         var drawList = ImGui.GetWindowDrawList();
         var canvasPos = ImGui.GetCursorScreenPos();
 
         // Find the overall bounds of all screens to center the visualization
         var overallBounds = GetOverallScreenBounds(screens);
 
-        // Calculate offset to center the visualization
-        var centerOffsetX = (ImGui.GetContentRegionAvail().X - (overallBounds.Width * scale)) * 0.5f;
+        // Calculate the needed area for the visualization at base scale
+        var neededArea = new Vector2(overallBounds.Width, overallBounds.Height) * baseScale;
+
+        // Define desired margins (in pixels)
+        var horizontalMargin = 10f; // 20 pixels margin on each side
+        var availableWidth = windowWidth - (horizontalMargin * 2);
+
+        // Calculate scale factor to fit within available width (with margins)
+        var scaleFactorX = availableWidth / neededArea.X;
+        var finalScale = baseScale * MathF.Min(1, scaleFactorX);
+
+        // Recalculate needed area with final scale
+        neededArea = new Vector2(overallBounds.Width, overallBounds.Height) * finalScale;
+
+        // Calculate center offset - this should be based on the final scaled size
+        var centerOffsetX = (windowWidth - neededArea.X) * 0.5f;
+
+        // Ensure the offset respects our minimum margin
+        centerOffsetX = Math.Max(horizontalMargin, centerOffsetX);
 
         // Reserve space for the canvas first
-        ImGui.InvisibleButton("screen_layout_canvas", new Vector2(overallBounds.Width * scale, overallBounds.Height * scale));
+        ImGui.InvisibleButton("screen_layout_canvas", neededArea);
         var canvasEndPos = ImGui.GetCursorScreenPos();
-     
-        
 
         ImGui.SetCursorScreenPos(canvasPos + new Vector2(centerOffsetX, 0));
 
         // Create a child window for the interactive elements to ensure proper hit testing
-        ImGui.BeginChild("Editor screen selection", new Vector2(overallBounds.Width * scale, overallBounds.Height * scale));
+        ImGui.BeginChild("Editor screen selection", neededArea);
         {
             foreach (var screen in screens)
             {
@@ -93,10 +119,10 @@ internal sealed class ScreenManager : Window
                 var screenIndex = Array.IndexOf(screens, screen);
 
                 // Calculate scaled position and size relative to overall bounds
-                var x = (bounds.X - overallBounds.X) * scale;
-                var y = (bounds.Y - overallBounds.Y) * scale;
-                var width = bounds.Width * scale;
-                var height = bounds.Height * scale;
+                var x = (bounds.X - overallBounds.X) * finalScale;
+                var y = (bounds.Y - overallBounds.Y) * finalScale;
+                var width = bounds.Width * finalScale;
+                var height = bounds.Height * finalScale;
 
                 // Position the radio button in top-left corner relative to the child window
                 ImGui.SetCursorPos(new Vector2(x + 5, y + 5));
@@ -149,17 +175,17 @@ internal sealed class ScreenManager : Window
         }
         ImGui.EndChild();
 
-        // First draw all the screen rectangles and labels
+        //Draw all the screen rectangles and labels
         foreach (var screen in screens)
         {
             var bounds = screen.Bounds;
             var screenIndex = Array.IndexOf(screens, screen);
 
             // Calculate scaled position and size relative to overall bounds
-            var x = canvasPos.X + centerOffsetX + (bounds.X - overallBounds.X) * scale;
-            var y = canvasPos.Y + (bounds.Y - overallBounds.Y) * scale;
-            var width = bounds.Width * scale;
-            var height = bounds.Height * scale;
+            var x = canvasPos.X + centerOffsetX + (bounds.X - overallBounds.X) * finalScale;
+            var y = canvasPos.Y + (bounds.Y - overallBounds.Y) * finalScale;
+            var width = bounds.Width * finalScale;
+            var height = bounds.Height * finalScale;
 
             // Draw screen rectangle
             var color = screen.Primary ? new Vector4(0.2f, 0.8f, 0.2f, 1.0f) : new Vector4(0.2f, 0.5f, 0.8f, 1.0f);
@@ -169,21 +195,21 @@ internal sealed class ScreenManager : Window
             drawList.AddRect(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)));
 
             // Draw screen label
-            var label = $"Screen {screenIndex + 1}";
+            var label = $"{screenIndex + 1}";
             if (screen.Primary)
                 label += " (Primary)";
 
             var textSize = ImGui.CalcTextSize(label);
-            var textPos = new Vector2(x + (width - textSize.X) * 0.5f, y + (height - textSize.Y) * 0.5f);
+            var textPos = new Vector2(x + (width - textSize.X) * 0.5f, y + (height - textSize.Y) * 0.75f);
             drawList.AddText(textPos, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), label);
         }
 
         // Calculate the scaled spanning area relative to overall bounds
         var scaledSpanning = new Vector4(
-            (UserSettings.Config.Rectangle.X - overallBounds.X) * scale,
-            (UserSettings.Config.Rectangle.Y - overallBounds.Y) * scale,
-            UserSettings.Config.Rectangle.Z * scale,
-            UserSettings.Config.Rectangle.W * scale
+            (UserSettings.Config.Rectangle.X - overallBounds.X) * finalScale,
+            (UserSettings.Config.Rectangle.Y - overallBounds.Y) * finalScale,
+            UserSettings.Config.Rectangle.Z * finalScale,
+            UserSettings.Config.Rectangle.W * finalScale
         );
 
         // Calculate the position on the canvas
@@ -197,7 +223,7 @@ internal sealed class ScreenManager : Window
             rectMin.Y + scaledSpanning.W
         );
 
-        // Draw the spanning area rectangle
+        // Draw the spanning area rectangle RED border
         drawList.AddRect(rectMin, rectMax, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 0, 0, 1)), 0, ImDrawFlags.RoundCornersNone, 4);
 
         // Set cursor position to continue after the visualization

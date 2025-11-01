@@ -25,7 +25,7 @@ internal static partial class WindowManager
             if (ImGui.MenuItem("Output Window", "", ShowSecondaryRenderWindow))
                 ShowSecondaryRenderWindow = !ShowSecondaryRenderWindow;
 
-            if (ImGui.BeginMenu("Output Window Display"))
+           /* if (ImGui.BeginMenu("Output Window Display"))
             {
                 for (var index = 0; index < screens.Count; index++)
                 {
@@ -38,7 +38,7 @@ internal static partial class WindowManager
                 }
 
                 ImGui.EndMenu();
-            }
+            }*/
         }
 
         ImGui.Separator();
