@@ -1,8 +1,10 @@
 using ImGuiNET;
+using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 using T3.Core.Utils;
 using T3.Editor.Gui.Input;
+using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.Gui.Windows.Layouts;
 using Vector2 = System.Numerics.Vector2;
@@ -31,11 +33,21 @@ internal sealed class ScreenManager : Window
 
     private static void DrawInnerContent()
     {
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(5, 5));
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text("Windows Display Layout: ");
+        ImGui.SameLine();
+        if (ImGui.Button("Open Settings"))
+        {
+            OpenWindowsDisplaySettings();
+        }
+        CustomComponents.TooltipForLastItem("Open Windows display settings to configure screen arrangement, resolution, etc.");
+        ImGui.PopStyleVar();
+        FormInputs.AddVerticalSpace(5);
+
         var screens = Screen.AllScreens;
         if (ImGui.CollapsingHeader("Available Screens", ImGuiTreeNodeFlags.DefaultOpen))
         {
-            
-
             // Display screen information in tree nodes
             for (var i = 0; i < screens.Length; i++)
             {
@@ -48,6 +60,7 @@ internal sealed class ScreenManager : Window
                     ImGui.BulletText($"Bounds: {screen.Bounds}");
                     //ImGui.BulletText($"Working Area: {screen.WorkingArea}"); // On Windows, this is the area excluding taskbars/docks
                     ImGui.BulletText($"Bits Per Pixel: {screen.BitsPerPixel}");
+                  //  ImGui.BulletText($"Refresh rate: {swa}");
 
                     ImGui.TreePop();
                 }
@@ -56,8 +69,7 @@ internal sealed class ScreenManager : Window
             }
 
             ImGui.Text($"Total screens detected: {screens.Length}");
-           
-           
+
         }
         // Draw visual screen layout
         FormInputs.AddVerticalSpace(10);
@@ -76,7 +88,7 @@ internal sealed class ScreenManager : Window
     private static void DrawScreenLayout(Screen[] screens)
     {   // This is all what we have to do in oder to make the screen layout responsive
         // var windowWidth = ImGui.GetContentRegionAvail().X; // This would be the available width, but when the scollbar appears it makes problems
-        var windowWidth = ImGui.GetWindowWidth()-12; // A bit of a hack to avoid scrollbar issues, 12 pixels is the width of the scrollbar. 
+        var windowWidth = ImGui.GetWindowWidth() - 12; // A bit of a hack to avoid scrollbar issues, 12 pixels is the width of the scrollbar. 
         var baseScale = 0.1f * T3Ui.UiScaleFactor;
         var drawList = ImGui.GetWindowDrawList();
         var canvasPos = ImGui.GetCursorScreenPos();
@@ -88,7 +100,7 @@ internal sealed class ScreenManager : Window
         var neededArea = new Vector2(overallBounds.Width, overallBounds.Height) * baseScale;
 
         // Define desired margins (in pixels)
-        var horizontalMargin = 10f; // 20 pixels margin on each side
+        var horizontalMargin = 10f;
         var availableWidth = windowWidth - (horizontalMargin * 2);
 
         // Calculate scale factor to fit within available width (with margins)
@@ -337,5 +349,41 @@ internal sealed class ScreenManager : Window
         var maxY = screens.Max(s => s.Bounds.Bottom);
 
         return new Rectangle(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    private static void OpenWindowsDisplaySettings()
+    {
+        try
+        {
+            // Modern Windows 10/11 way - opens directly to display settings
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "ms-settings:display",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            // Fallback methods if the modern way fails
+            try
+            {
+                // Alternative method 1 - Control panel display settings
+                Process.Start("control", "desk.cpl,,3");
+            }
+            catch
+            {
+                // Alternative method 2 - Direct display properties
+                try
+                {
+                    Process.Start("desk.cpl");
+                }
+                catch (Exception fallbackEx)
+                {
+                    // Log the error or show a message to the user
+                    Debug.WriteLine($"Failed to open display settings: {ex.Message}");
+                    Debug.WriteLine($"Fallback also failed: {fallbackEx.Message}");
+                }
+            }
+        }
     }
 }

@@ -45,18 +45,19 @@ internal static class ProgramWindows
     {
         if (Main.IsFullScreen == UserSettings.Config.FullScreen)
             return;
-
+        var screenCount = Screen.AllScreens.Length;
         if (UserSettings.Config.FullScreen)
         {
-            var screenCount = Screen.AllScreens.Length;
+            
             Main.SetFullScreen(UserSettings.Config.FullScreenIndexMain < screenCount ? UserSettings.Config.FullScreenIndexMain : 0, false, Vector4.One);
-            Viewer.SetFullScreen(UserSettings.Config.FullScreenIndexViewer < screenCount ? UserSettings.Config.FullScreenIndexViewer : 0, true, UserSettings.Config.Rectangle);
+            
         }
         else
         {
             Main.SetSizeable();
-            Viewer.SetSizeable();
+            //Viewer.SetSizeable();
         }
+        Viewer.SetFullScreen(UserSettings.Config.FullScreenIndexViewer < screenCount ? UserSettings.Config.FullScreenIndexViewer : 0, true, UserSettings.Config.Rectangle);
     }
 
     private sealed class  DisplayAdapterRating()
