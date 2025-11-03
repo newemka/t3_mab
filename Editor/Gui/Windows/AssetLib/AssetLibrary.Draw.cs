@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using System.IO;
 using System.Runtime.CompilerServices;
 using ImGuiNET;
 using T3.Core.DataTypes.Vector;
@@ -16,30 +17,48 @@ internal sealed partial class AssetLibrary
 {
     private void DrawLibContent()
     {
-        var iconCount = 1;
+        var iconCount = 2;
         _state.TreeHandler.Update();
 
         CustomComponents.DrawInputFieldWithPlaceholder("Search Assets...",
                                                        ref _state.Filter.SearchString,
-                                                       -ImGui.GetFrameHeight() * iconCount + 16);
+                                                       -ImGui.GetFrameHeight() * iconCount + 18 * T3Ui.UiScaleFactor);
 
-        ImGui.SameLine();
-
-        var collapseIconState = _state.TreeHandler.NoFolderOpen 
-                               ? CustomComponents.ButtonStates.Dimmed 
-                               : CustomComponents.ButtonStates.Normal;
-
-
-        if (CustomComponents.IconButton(Icon.TreeCollapse, Vector2.Zero, collapseIconState))
+        // Collapse icon
         {
-            //_state.CollapseTreeTriggered = true; // Will be updated next frame
-            _state.TreeHandler.CollapseAll();
+            ImGui.SameLine();
+            var collapseIconState = _state.TreeHandler.NoFolderOpen
+                                        ? CustomComponents.ButtonStates.Dimmed
+                                        : CustomComponents.ButtonStates.Normal;
+
+            if (CustomComponents.IconButton(Icon.TreeCollapse, Vector2.Zero, collapseIconState))
+            {
+                _state.TreeHandler.CollapseAll();
+            }
         }
 
-        
+        // Tools and settings
+        {
+            ImGui.SameLine();
+            var toolItemState = _state.ActiveTypeFilters.Count > 0
+                                    ? CustomComponents.ButtonStates.NeedsAttention
+                                    : CustomComponents.ButtonStates.Normal;
+
+            if (CustomComponents.IconButton(Icon.Settings2, Vector2.Zero, toolItemState))
+            {
+                ImGui.OpenPopup(SettingsPopUpId);
+            }
+
+            DrawAssetToolsPopup();
+        }
+
         ImGui.BeginChild("scrolling", Vector2.Zero, false, ImGuiWindowFlags.NoBackground);
         {
+            ImGui.PushStyleVar(ImGuiStyleVar.IndentSpacing, 10);
+            ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(0));
+            ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0));
             DrawFolder(_state.RootFolder);
+            ImGui.PopStyleVar(3);
         }
         ImGui.EndChild();
     }
@@ -115,7 +134,7 @@ internal sealed partial class AssetLibrary
 
                     var timeSinceChange = (float)(ImGui.GetTime() - _state.TimeActiveInstanceChanged);
                     var fadeProgress = (timeSinceChange / 0.5f).Clamp(0, 1);
-                    var blinkFade = MathF.Cos(timeSinceChange * 15f) * (1f - fadeProgress) * 0.5f + 0.5f;
+                    var blinkFade = -MathF.Cos(timeSinceChange * 15f) * (1f - fadeProgress) * 0.7f + 0.75f;
                     var color = UiColors.StatusActivated.Fade(blinkFade);
                     Icons.DrawIconCenter(Icon.Aim, color);
 
@@ -165,18 +184,17 @@ internal sealed partial class AssetLibrary
     private void DrawAssetItem(AssetItem asset)
     {
         var isSelected = asset.AbsolutePath == _state.ActiveAbsolutePath;
-        
+
         var fileConsumerOpSelected = _state.CompatibleExtensionIds.Count > 0;
-        var fileConsumerOpIsCompatible =  fileConsumerOpSelected 
-                                          && _state.CompatibleExtensionIds.Contains(asset.FileExtensionId);
+        var fileConsumerOpIsCompatible = fileConsumerOpSelected
+                                         && _state.CompatibleExtensionIds.Contains(asset.FileExtensionId);
 
         // Skip not matching asset
         if (fileConsumerOpSelected && !fileConsumerOpIsCompatible)
             return;
-        
+
         ImGui.PushID(RuntimeHelpers.GetHashCode(asset));
         {
-            
             var fade = !fileConsumerOpSelected
                            ? 0.8f
                            : fileConsumerOpIsCompatible
@@ -203,7 +221,7 @@ internal sealed partial class AssetLibrary
                 }
             }
 
-            if (isSelected && !ImGui.IsItemVisible() && _state.HasActiveInstanceChanged) 
+            if (isSelected && !ImGui.IsItemVisible() && _state.HasActiveInstanceChanged)
             {
                 ImGui.SetScrollHereY();
             }

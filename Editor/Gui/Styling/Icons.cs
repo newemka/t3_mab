@@ -84,15 +84,14 @@ internal static class Icons
 
     public static void DrawIconCenter(Icon icon, Color color, float alignment = 0.5f)
     {
-        
         var pos = ImGui.GetItemRectMin();
         var size = ImGui.GetItemRectMax() - pos;
         GetGlyphDefinition(icon, out var uvRange, out var iconSize);
-        var centerOffset = MathUtils.Floor((size - iconSize) * new Vector2(alignment, 0.5f));
-        var alignedPos = pos + centerOffset;
+        var centerOffset = (size - iconSize) * new Vector2(alignment, 0.5f);
+        var alignedPos = MathUtils.Floor(pos + centerOffset);
         ImGui.GetWindowDrawList().AddImage(ImGui.GetIO().Fonts.TexID,
                                            alignedPos,
-                                           alignedPos + iconSize,
+                                           (alignedPos + iconSize),
                                            uvRange.Min,
                                            uvRange.Max,
                                            color);
@@ -164,8 +163,8 @@ internal static class Icons
             new(Icon.DopeSheetKeyframeSmooth, 5, new Vector2(9, 25)),
             new(Icon.DopeSheetKeyframeSmoothSelected, 6, new Vector2(9, 25)),
 
-            new(Icon.DopeSheetKeyframeCubic, 8, new Vector2(9, 25)),
-            new(Icon.DopeSheetKeyframeCubicSelected, 7, new Vector2(9, 25)),
+            new(Icon.DopeSheetKeyframeCubic, 7, new Vector2(9, 25)),
+            new(Icon.DopeSheetKeyframeCubicSelected, 8, new Vector2(9, 25)),
             
             new(Icon.DopeSheetKeyframeHorizontal, 9, new Vector2(9, 25)),
             new(Icon.DopeSheetKeyframeHorizontalSelected, 10, new Vector2(9, 25)),
@@ -290,6 +289,7 @@ internal static class Icons
             new(Icon.Aim, slotIndex: 124),
             new(Icon.RotateCounterClockwise, slotIndex: 125),
             new(Icon.RotateClockwise, slotIndex: 126),
+            new(Icon.Stack, slotIndex: 127),
             
         };
 
@@ -428,4 +428,5 @@ public enum Icon
     RotateCounterClockwise,
     ConnectedOutput,
     ViewCanvas,
+    Stack
 }

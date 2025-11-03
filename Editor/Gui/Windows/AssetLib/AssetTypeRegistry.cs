@@ -15,6 +15,7 @@ public static class AssetTypeRegistry
         public required List<Guid> PrimaryOperators;
         public required Color Color;
         public required Icon Icon;
+        public int MatchingFileCount;
 
         internal AssetType(string name, List<int> extensionIds)
         {
@@ -25,6 +26,16 @@ public static class AssetTypeRegistry
                 _assetTypeForId[id] = this;
             }
         }
+    }
+
+    internal static void ClearMatchingFileCounts()
+    {
+        foreach (var a in _assetTypes)
+        {
+            a.MatchingFileCount = 0;
+        }
+
+        TotalAssetCount = 0;
     }
 
     internal static bool TryGetFromId(int id, [NotNullWhen(true)] out AssetType? type)
@@ -133,4 +144,6 @@ public static class AssetTypeRegistry
 
     private static readonly Dictionary<int, AssetType> _assetTypeForId = [];
     private static List<AssetType> _assetTypes = InitTypes();
+    public static  List<AssetType> AssetTypes => _assetTypes;
+    internal static int TotalAssetCount;
 }

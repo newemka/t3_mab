@@ -299,7 +299,7 @@ internal sealed class UiElements
                 ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(5, 5));
                 if (ImGui.BeginPopupContextItem("windows_context_menu"))
                 {
-                    if (ImGui.MenuItem("Open in Explorer"))
+                    if (ImGui.MenuItem("Reveal in Explorer"))
                     {
                         CoreUi.Instance.OpenWithDefaultApplication(package.Folder);
                     }

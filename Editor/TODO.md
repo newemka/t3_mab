@@ -27,7 +27,9 @@
 - [ ] Fix: Rename Direction "RandomAmount" -> Variation
 - [ ] Idea: Add option to switch space of SnapToAnglesForce 
 - [ ] Fix: SwitchParticleForce filtering with -1 and -2
-
+- [ ] Fix: render-Resolution factor is no longer working?
+- 
+- [ ] Complete import T3-project window?
 
 # Asset-Lib
 - [x] Undo/Do for changing
@@ -39,7 +41,8 @@
   - [x] Link Image -> [LoadImage]
 - [ ] Toolbar
   - [x] Collapse all
-  - [ ] Context menu
+  - [x] Context menu
+    - [ ] File Selections 
     - [ ] Action...
       - [ ] Review in Explorer
       - [ ] Edit externally
@@ -48,8 +51,8 @@
       - [ ] Later: find references
       - [ ] Group selecting into Folder
       - [ ] Create Folder
-    - [ ] Filter with counts
-      - [ ] List derived from AssetTypeRegistry
+    - [x] Filter with counts
+      - [x] List derived from AssetTypeRegistry
 - [ ] Select multiple (e.g. Shift)
 - [ ] Keyboard navigation Up/Down Left/Right for collapse
 - [ ] Search / Filter

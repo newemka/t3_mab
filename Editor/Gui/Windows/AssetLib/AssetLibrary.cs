@@ -9,6 +9,7 @@ using T3.Core.Operator;
 using T3.Core.Operator.Slots;
 using T3.Core.Resource;
 using T3.Editor.Gui.InputUi.SimpleInputUis;
+using T3.Editor.Gui.UiHelpers;
 using T3.Editor.UiModel;
 using T3.Editor.UiModel.ProjectHandling;
 using T3.Editor.UiModel.Selection;
@@ -46,12 +47,7 @@ internal sealed partial class AssetLibrary : Window
         UpdateActiveSelection(selectedInstance);
 
         // Draw
-        ImGui.PushStyleVar(ImGuiStyleVar.IndentSpacing, 10);
-        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(0));
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0));
-        //ImGui.PushStyleVar(ImGuiStyleVar.ItemInnerSpacing, new Vector2(0));
         DrawLibContent();
-        ImGui.PopStyleVar(3);
     }
 
     private void UpdateAssetsIfRequired()
@@ -61,13 +57,16 @@ internal sealed partial class AssetLibrary : Window
             return;
 
         if (_state.LastFileWatcherState == ResourceFileWatcher.FileStateChangeCounter
-            && !HasObjectChanged(_state.Composition, ref _lastCompositionObjId))
+            && !HasObjectChanged(_state.Composition, ref _lastCompositionObjId)
+            && !_state.FilteringNeedsUpdate)
             return;
 
         _state.TreeHandler.Reset();
         _state.LastFileWatcherState = ResourceFileWatcher.FileStateChangeCounter;
 
         _state.AllAssets.Clear();
+        AssetTypeRegistry.ClearMatchingFileCounts();
+        
         var filePaths = ResourceManager.EnumerateResources([],
                                                            isFolder: false,
                                                            _state.Composition.AvailableResourcePackages,
@@ -106,11 +105,23 @@ internal sealed partial class AssetLibrary : Window
                             };
                 _state.AssetCache[aliasedPath] = asset;
             }
+            
+            if (asset.AssetType != null)
+            {
+                asset.AssetType.MatchingFileCount++;
+                AssetTypeRegistry.TotalAssetCount++;
+            }
 
-            _state.AllAssets.Add(asset);
+            if (_state.CompatibleExtensionIds.Count == 0
+                || _state.CompatibleExtensionIds.Contains(asset.FileExtensionId))
+            {
+                _state.AllAssets.Add(asset);
+            }
+            
         }
 
         AssetFolder.PopulateCompleteTree(_state, filterAction: null);
+        _state.FilteringNeedsUpdate = false;
     }
 
     private static void ParsePath(string path, out string package, out List<string> folders)
@@ -138,12 +149,29 @@ internal sealed partial class AssetLibrary : Window
 
         // Check if active instance has asset reference...
         var instance = _state.ActiveInstance;
-
+        
         if (TryGetFileInputFromInstance(instance, out _state.ActivePathInput, out var stringInputUi))
         {
             var filePath = _state.ActivePathInput.GetCurrentValue();
             ResourceManager.TryResolvePath(filePath, instance, out _state.ActiveAbsolutePath, out _);
-            FileExtensionRegistry.IdsFromFileFilter(stringInputUi.FileFilter, ref _state.CompatibleExtensionIds);
+
+            if (UserSettings.Config.SyncWithOperatorSelection)
+            {
+                FileExtensionRegistry.IdsFromFileFilter(stringInputUi.FileFilter, ref _state.CompatibleExtensionIds);
+                _state.ActiveTypeFilters.Clear();
+                foreach (var assetType in AssetTypeRegistry.AssetTypes)
+                {
+                    foreach (var extId in _state.CompatibleExtensionIds)
+                    {
+                        if (!assetType.ExtensionIds.Contains(extId)) 
+                            continue;
+                        
+                        _state.ActiveTypeFilters.Add(assetType);
+                        break;
+                    }
+                }
+                
+            }
         }
         else
         {

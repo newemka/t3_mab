@@ -56,6 +56,8 @@ internal sealed class AssetLibState
     public readonly AssetFolder RootFolder = new(AssetFolder.RootNodeId, null);
     
     public readonly SymbolFilter Filter = new();
+    
+    public readonly HashSet<AssetTypeRegistry.AssetType> ActiveTypeFilters = [];
 
     #region internal
     /// <summary>
@@ -67,7 +69,7 @@ internal sealed class AssetLibState
     public bool OpenedLibFolderOnce;
     
     public readonly TreeHandler TreeHandler = new();
-    
+    public bool FilteringNeedsUpdate;
     #endregion
     
 }

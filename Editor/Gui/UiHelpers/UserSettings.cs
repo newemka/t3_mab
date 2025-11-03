@@ -110,6 +110,10 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
 
         public bool EditorHoverPreview = true;
 
+        // Asset Lib
+        public bool SyncWithOperatorSelection = true;
+        public bool ScrollAssetLibToActive = true;
+        
         // Load Save
         public string UserName = UndefinedUserName;
         public bool EnableAutoBackup = true;

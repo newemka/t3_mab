@@ -1,5 +1,6 @@
 #nullable enable
 using ImGuiNET;
+using T3.Core.Utils;
 using T3.Editor.Gui.Interaction;
 using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
@@ -608,7 +609,9 @@ internal static class FormInputs
 
     public static void AddVerticalSpace(float size = 10)
     {
-        ImGui.Dummy(new Vector2(1, size * T3Ui.UiScaleFactor));
+        ImGui.SetCursorPos( new Vector2( ImGui.GetCursorStartPos().X,
+                                         ImGui.GetCursorPosY() 
+                                         +size * T3Ui.UiScaleFactor));
     }
 
     #region layout helpers

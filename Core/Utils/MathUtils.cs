@@ -402,7 +402,7 @@ public static class MathUtils
         return new Vector2(lhs.X < rhs.X ? lhs.X : rhs.X, lhs.Y < rhs.Y ? lhs.Y : rhs.Y);
     }
 
-    public static Vector2 Floor(Vector2 v)
+    public static Vector2 Floor(this Vector2 v)
     {
         return new Vector2((float)Math.Floor(v.X), (float)Math.Floor(v.Y));
     }

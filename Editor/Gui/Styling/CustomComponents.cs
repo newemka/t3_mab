@@ -139,17 +139,15 @@ internal static class CustomComponents
         return clicked;
     }
 
-    
-    
     public static bool ToggleIconButton(Icon icon, string label, ref bool isSelected, Vector2 size, bool trigger = false)
     {
         var clicked = false;
         var stateTextColor = isSelected
                                  ? UiColors.StatusActivated.Rgba
                                  : UiColors.TextDisabled.Rgba;
-        
+
         ImGui.PushStyleColor(ImGuiCol.Text, stateTextColor);
-        
+
         var yAlign = ComputeVerticalIconAlign(size.Y);
 
         var align = string.IsNullOrEmpty(label) ? new Vector2(0.1f, yAlign) : new Vector2(0.5f, yAlign);
@@ -245,46 +243,29 @@ internal static class CustomComponents
         if (size == Vector2.Zero)
         {
             var h = ImGui.GetFrameHeight();
-            size = new Vector2(h, h);
+            size = new Vector2(h);
         }
 
-        ImGui.PushFont(Icons.IconFont);
-        var yAlign = ComputeVerticalIconAlign(size.Y);
-
-        // Draw some debug vis
-        // {
-        //     var drawList = ImGui.GetForegroundDrawList();
-        //     var p = ImGui.GetCursorScreenPos();
-        //     drawList.AddRect(p, p + new Vector2(3, size.Y), UiColors.StatusActivated);
-        //     drawList.AddRect(p, p + new Vector2(5, Icons.FontSize), UiColors.StatusAnimated);
-        // }
-        
-        ImGui.PushStyleVar(ImGuiStyleVar.ButtonTextAlign, new Vector2(0.5f, yAlign));
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.Zero);
-
         ImGui.PushStyleColor(ImGuiCol.ButtonActive, UiColors.BackgroundButtonActivated.Rgba);
 
-        if (state != ButtonStates.Normal)
+        if (state == ButtonStates.Activated)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, GetStateColor(state).Rgba);
-            if (state == ButtonStates.Activated)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, UiColors.BackgroundButtonActivated.Rgba);
-                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, UiColors.BackgroundButtonActivated.Fade(0.8f).Rgba);
-            }
+            ImGui.PushStyleColor(ImGuiCol.Button, UiColors.BackgroundButtonActivated.Rgba);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, UiColors.BackgroundButtonActivated.Fade(0.8f).Rgba);
         }
 
-        var clicked = ImGui.Button("" + (char)icon, size) || triggered;
+        ImGui.PushID((int)icon);
+        var clicked = ImGui.Button(string.Empty, size) || triggered;
+        Icons.DrawIconCenter(icon, GetStateColor(state).Rgba);
+        ImGui.PopID();
 
-        if (state != ButtonStates.Normal)
-            ImGui.PopStyleColor();
+        ImGui.PopStyleColor();
 
         if (state == ButtonStates.Activated)
             ImGui.PopStyleColor(2);
 
-        ImGui.PopStyleColor(1);
-        ImGui.PopStyleVar(2);
-        ImGui.PopFont();
+        ImGui.PopStyleVar(1);
         return clicked;
     }
 
@@ -349,7 +330,7 @@ internal static class CustomComponents
             if (wasDraggingRight)
                 return;
         }
-        
+
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(6, 6));
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(6, 6));
 
@@ -373,6 +354,90 @@ internal static class CustomComponents
         }
 
         ImGui.PopStyleVar(2);
+    }
+
+    public static bool DrawMenuItem(int id, string label, ref bool isChecked, string keyboardShortCut = null)
+    {
+        var clicked = DrawMenuItem(id, label, keyboardShortCut, isChecked);
+        if (clicked)
+        {
+            isChecked = !isChecked;
+        }
+
+        return clicked;
+    }
+
+    public static bool DrawMenuItem(int id, string label, string keyboardShortCut = null, bool isChecked = false, bool isEnabled = true)
+    {
+        var h = ImGui.GetFrameHeight();
+        var imguiPadding = ImGui.GetStyle().ItemSpacing;
+
+        var shortCutWidth = string.IsNullOrEmpty(keyboardShortCut) ? 0 : ImGui.CalcTextSize(keyboardShortCut).X;
+        var labelWidth = ImGui.CalcTextSize(label).X;
+
+        var paddingFactor = 1.4f;
+        var leftPadding = imguiPadding.X + Icons.FontSize * paddingFactor;
+
+        var width = leftPadding + labelWidth + imguiPadding.X *2;
+        if (shortCutWidth > 0)
+        {
+            width += shortCutWidth + h;
+        }
+
+        
+        var windowWidth = ImGui.GetColumnWidth();
+        //var windowWidth = ImGui.GetWindowWidth();
+        
+        if(width < windowWidth)
+            width = windowWidth;
+        
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, Vector2.Zero);
+        ImGui.PushID(id);
+        //var clicked = ImGui.Selectable(string.Empty);
+        var clicked = ImGui.InvisibleButton(string.Empty, new Vector2(width, h)) && isEnabled;
+        ImGui.PopID();
+        ImGui.PopStyleVar();
+
+        var fade = isEnabled ? 1 : 0.5f;
+
+        var min = ImGui.GetItemRectMin();
+        var max = ImGui.GetItemRectMax();
+        var drawList = ImGui.GetWindowDrawList();
+
+        if (isEnabled && ImGui.IsItemHovered())
+        {
+            drawList.AddRectFilled(min,max, UiColors.BackgroundActive.Fade(0.25f), 4);
+        }
+        
+        if (isChecked)
+        {
+            //Icons.DrawIconCenter(Icon.Checkmark, UiColors.Text.Fade(fade), 0);
+            Icons.DrawIconAtScreenPosition(Icon.Checkmark,
+                                           (min + new Vector2(imguiPadding.X,
+                                                              h / 2 - Icons.FontSize / 2)).Floor(),
+                                           drawList, UiColors.Text);
+        }
+        
+        var textHeight = ImGui.GetFontSize();
+        drawList.AddText(min + new Vector2(leftPadding,
+                                           h / 2 - textHeight / 2),
+                         UiColors.Text.Fade(fade),
+                         label);
+
+        if (!string.IsNullOrEmpty(keyboardShortCut))
+        {
+            drawList.AddText(min
+                             + new Vector2(windowWidth - shortCutWidth,
+                                           h / 2 - textHeight / 2),
+                             UiColors.TextMuted.Fade(fade),
+                             keyboardShortCut);
+        }
+
+        if (clicked)
+        {
+            ImGui.CloseCurrentPopup();
+        }
+        return clicked;
     }
 
     public static void DrawContextMenuForScrollCanvas(Action drawMenuContent, ref bool contextMenuIsOpen)
@@ -441,7 +506,6 @@ internal static class CustomComponents
     {
         ImGui.PushFont(Fonts.FontSmall);
         ImGui.PushStyleColor(ImGuiCol.Text, UiColors.TextMuted.Rgba);
-        //ImGui.TextUnformatted(text);
         ImGui.TextWrapped(text);
         ImGui.PopStyleColor();
         ImGui.PopFont();
@@ -453,15 +517,12 @@ internal static class CustomComponents
         FormInputs.AddVerticalSpace(5);
         ImGui.PushFont(Fonts.FontSmall);
         ImGui.PushStyleColor(ImGuiCol.Text, UiColors.TextMuted.Rgba);
-        ImGui.SetCursorPosX(4);
         ImGui.TextUnformatted(text.ToUpperInvariant());
         ImGui.PopStyleColor();
         ImGui.PopFont();
         FormInputs.AddVerticalSpace(2);
     }
-    
-    
-    
+
     public static void MenuGroupHeader(string text)
     {
         FormInputs.AddVerticalSpace(1);
@@ -470,7 +531,23 @@ internal static class CustomComponents
         ImGui.TextUnformatted(text);
         ImGui.PopStyleColor();
         ImGui.PopFont();
-        
+    }
+
+    /// <summary>
+    /// Uses slightly different styling than ImGui.Separator()
+    /// </summary>
+    public static void SeparatorLine()
+    {
+        FormInputs.AddVerticalSpace(4);
+        ImGui.SetCursorPosX(0);
+        var p = ImGui.GetCursorScreenPos();
+
+        //var p = ImGui.GetWindowContentRegionMin() + ImGui.GetWindowPos() + new Vector2(1,1);
+        ImGui.GetWindowDrawList()
+             .AddRectFilled(p,
+                            p + new Vector2(ImGui.GetWindowSize().X, 1), UiColors.ForegroundFull.Fade(0.1f));
+
+        FormInputs.AddVerticalSpace(5);
     }
 
     /// <summary>
@@ -696,13 +773,13 @@ internal static class CustomComponents
         if (!isEnabled)
         {
             Icons.DrawIconCenter(isSelected ? iconOn : iconOff, isSelected
-                                                                        ? (needsAttention ? UiColors.StatusAttention : UiColors.BackgroundActive)
-                                                                        : UiColors.TextDisabled.Fade(0.5f));
+                                                                    ? (needsAttention ? UiColors.StatusAttention : UiColors.BackgroundActive)
+                                                                    : UiColors.TextDisabled.Fade(0.5f));
             return false;
         }
 
         Icons.DrawIconCenter(isSelected ? iconOn : iconOff,
-                                 isSelected ? (needsAttention ? UiColors.StatusAttention : UiColors.BackgroundActive) : UiColors.TextMuted);
+                             isSelected ? (needsAttention ? UiColors.StatusAttention : UiColors.BackgroundActive) : UiColors.TextMuted);
         if (clicked)
             isSelected = !isSelected;
 
@@ -728,7 +805,8 @@ internal static class CustomComponents
             value = string.Empty;
 
         ImGui.SetNextItemWidth(width - FormInputs.ParameterSpacing - (notEmpty ? ImGui.GetFrameHeight() : 0));
-        var modified = ImGui.InputText("##" + placeHolderLabel, ref value, 1000, inputFlags);
+
+        var modified = ImGui.InputText("##", ref value, 1000, inputFlags);
         if (!modified && wasNull)
             value = null;
 
@@ -846,15 +924,15 @@ internal static class CustomComponents
         }
     }
 
-    public static void StylizedText(string text, ImFontPtr imFont, Color color, bool addPadding= false)
+    public static void StylizedText(string text, ImFontPtr imFont, Color color, bool addPadding = false)
     {
         ImGui.PushFont(imFont);
         ImGui.PushStyleColor(ImGuiCol.Text, color.Rgba);
         ImGui.TextUnformatted(text);
         ImGui.PopStyleColor();
         ImGui.PopFont();
-        
-        if(addPadding)
+
+        if (addPadding)
             ImGui.Dummy(new Vector2(1, 5 * T3Ui.UiScaleFactor));
     }
 }
