@@ -1,16 +1,17 @@
-using System.ComponentModel;
-using System.Drawing;
-using System.IO;
-using System.Windows.Forms;
 using SharpDX;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using SharpDX.Windows;
+using System.ComponentModel;
+using System.Drawing;
+using System.IO;
+using System.Windows.Forms;
 using T3.Core.DataTypes.Vector;
 using T3.Core.Resource;
 using T3.Core.SystemUi;
 using T3.Editor.Gui.Styling;
+using T3.Editor.Gui.UiHelpers;
 using Device = SharpDX.Direct3D11.Device;
 using Icon = System.Drawing.Icon;
 using Rectangle = System.Drawing.Rectangle;
@@ -86,23 +87,42 @@ internal sealed class AppWindow
         return dpi;
     }
 
-    internal void SetFullScreen(int screenIndex, bool spanover, Vector4 spanning)
+    internal void SetFullScreen(int screenIndex)
     {
         _boundsBeforeFullscreen = Form.Bounds;
         Form.FormBorderStyle = FormBorderStyle.Sizable;
         Form.WindowState = FormWindowState.Normal;
         Form.FormBorderStyle = FormBorderStyle.None;
+        Form.Bounds = Screen.AllScreens[screenIndex].Bounds;
+  
+    }
+
+    internal void SetViewerMode(bool spanover, Vector4 spanning)
+    {
+        
         if (!spanover)
         {
-            Form.Bounds = Screen.AllScreens[screenIndex].Bounds;
+            return;
         }
         else
         {
-            //Form.Bounds = new Rectangle(1920, 0, 3840, 1080);
-            
+            Form.FormBorderStyle = FormBorderStyle.None;
             Form.Bounds = new Rectangle((int)spanning.X, (int)spanning.Y, (int)spanning.Z, (int)spanning.W);
         }
-        
+    }
+
+    internal void UpdateSpanningBounds(int x, int y, int width, int height)
+    {
+        if (Form.FormBorderStyle == FormBorderStyle.None)
+        {
+            Form.Bounds = new Rectangle(x, y, width, height);
+        }
+        else
+        {
+            _boundsBeforeFullscreen = Form.Bounds;
+            Form.FormBorderStyle = FormBorderStyle.None;
+            Form.Bounds = new Rectangle(x, y, width, height);
+        }
     }
 
     internal void InitViewSwapChain(Factory factory)

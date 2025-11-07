@@ -385,7 +385,7 @@ internal static class AppMenuBar
 
             ImGui.MenuItem("Interactions Overlay", "", ref UserSettings.Config.ShowInteractionOverlay);
             ImGui.Separator();
-            ImGui.MenuItem("Fullscreen", UserActions.ToggleFullscreen.ListShortcuts(), ref UserSettings.Config.FullScreen);
+            ImGui.MenuItem("Fullscreen UI", UserActions.ToggleFullscreen.ListShortcuts(), ref UserSettings.Config.FullScreen);
 
            /* var screens = EditorUi.Instance.AllScreens;
             if (ImGui.BeginMenu("Fullscreen Display"))

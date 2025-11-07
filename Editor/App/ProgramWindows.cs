@@ -45,19 +45,57 @@ internal static class ProgramWindows
     {
         if (Main.IsFullScreen == UserSettings.Config.FullScreen)
             return;
+
         var screenCount = Screen.AllScreens.Length;
         if (UserSettings.Config.FullScreen)
         {
-            
-            Main.SetFullScreen(UserSettings.Config.FullScreenIndexMain < screenCount ? UserSettings.Config.FullScreenIndexMain : 0, false, Vector4.One);
-            
+            Main.SetFullScreen(UserSettings.Config.FullScreenIndexMain < screenCount ? UserSettings.Config.FullScreenIndexMain : 0);
         }
         else
         {
             Main.SetSizeable();
-            //Viewer.SetSizeable();
         }
-        Viewer.SetFullScreen(UserSettings.Config.FullScreenIndexViewer < screenCount ? UserSettings.Config.FullScreenIndexViewer : 0, true, UserSettings.Config.Rectangle);
+    }
+
+    /// <summary>
+    /// Updates the viewer window spanning bounds dynamically
+    /// Called whenever the spanning area selection changes in the Screen Manager
+    /// </summary>
+    internal static void UpdateViewerSpanning(Vector4 spanningBounds)
+    {
+        if (Viewer == null)
+            return;
+
+        // Check if there's a valid spanning area defined
+        if (spanningBounds.Z > 0 && spanningBounds.W > 0)
+        {
+            // Update the viewer window to the spanning bounds
+            Viewer.UpdateSpanningBounds(
+                (int)spanningBounds.X,
+                (int)spanningBounds.Y,
+                (int)spanningBounds.Z,
+                (int)spanningBounds.W
+            );
+        }
+    
+    }
+
+    /// <summary>
+    /// Call this when the secondary render window is enabled/disabled
+    /// to ensure the viewer window is properly configured
+    /// </summary>
+    internal static void UpdateViewerWindowState()
+    {
+        if (Viewer == null)
+            return;
+
+        var spanningBounds = UserSettings.Config.OutputArea;
+
+        // If there's a valid spanning area, apply it
+        if (spanningBounds.Z > 0 && spanningBounds.W > 0)
+        {
+            UpdateViewerSpanning(spanningBounds);
+        }
     }
 
     private sealed class  DisplayAdapterRating()
@@ -225,6 +263,11 @@ internal static class ProgramWindows
         Viewer.InitializeWindow(FormWindowState.Normal, null, false);
         Viewer.Show();
     }
+
+    /// <summary>
+    /// Updates the viewer window spanning bounds dynamically
+    /// </summary>
+   
 
     private static void OnCloseMainWindow(object sender, CancelEventArgs args)
     {

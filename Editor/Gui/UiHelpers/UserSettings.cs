@@ -123,9 +123,10 @@ public sealed class UserSettings : Settings<UserSettings.ConfigData>
 
         // Fullscreen settings
         public int FullScreenIndexMain = 0;
-        // Output window 
+        // Output window
+        public bool SpanningMode = false;
         public int FullScreenIndexViewer = 0;
-        public Vector4 Rectangle = new(1920,0,1280,720);
+        public Vector4 OutputArea = new(1920,0,1280,720);
 
         // Timeline
         public float TimeRasterDensity = 1f;

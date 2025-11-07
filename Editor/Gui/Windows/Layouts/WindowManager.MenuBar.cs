@@ -1,5 +1,6 @@
 #nullable enable
 using ImGuiNET;
+using T3.Editor.App;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.SystemUi;
 
@@ -23,7 +24,11 @@ internal static partial class WindowManager
             var screens = EditorUi.Instance.AllScreens;
 
             if (ImGui.MenuItem("Output Window", "", ShowSecondaryRenderWindow))
+            {
                 ShowSecondaryRenderWindow = !ShowSecondaryRenderWindow;
+                ProgramWindows.UpdateViewerWindowState();
+            }
+                
 
            /* if (ImGui.BeginMenu("Output Window Display"))
             {
