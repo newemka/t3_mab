@@ -8,6 +8,7 @@ using T3.Editor.Gui.Input;
 using T3.Editor.Gui.Styling;
 using T3.Editor.Gui.UiHelpers;
 using T3.Editor.Gui.Windows.Layouts;
+using Icon = T3.Editor.Gui.Styling.Icon;
 using Vector2 = System.Numerics.Vector2;
 
 namespace T3.Editor.Gui.Windows;
@@ -23,8 +24,9 @@ internal sealed class ScreenManager : Window
     {
         FormInputs.AddVerticalSpace(15);
 
-        ImGui.Indent(5);
+        ImGui.Indent(10);
         DrawInnerContent();
+        ImGui.Unindent(10);
     }
 
     internal override IReadOnlyList<Window> GetInstances()
@@ -68,7 +70,7 @@ internal sealed class ScreenManager : Window
 
         FormInputs.AddVerticalSpace(10);
         DrawScreenLayout(screens);
-        ShowAvailableScreensInformation(screens);
+       // ShowAvailableScreensInformation(screens);
         
     }
 
@@ -149,7 +151,7 @@ internal sealed class ScreenManager : Window
                 var y = (bounds.Y - overallBounds.Y) * finalScale;
                 var width = bounds.Width * finalScale;
                 var height = bounds.Height * finalScale;
-
+                
                 // Position the radio button in top-left corner relative to the child window
                 ImGui.SetCursorPos(new Vector2(x + 5, y + 5));
 
@@ -208,7 +210,7 @@ internal sealed class ScreenManager : Window
                 ImGui.PopID();
 
             }
-                //Draw all the screen rectangles and labels
+            //Draw all the screen rectangles and labels
             foreach (var screen in screens)
             {
                 var bounds = screen.Bounds;
@@ -219,19 +221,20 @@ internal sealed class ScreenManager : Window
                 var y = canvasPos.Y + (bounds.Y - overallBounds.Y) * finalScale;
                 var width = bounds.Width * finalScale;
                 var height = bounds.Height * finalScale;
-
+                var min = new Vector2(x, y);
+              
                 // Draw screen rectangle
                 var color = screen.Primary ? new Vector4(0.2f, 0.8f, 0.2f, 1.0f) : new Vector4(0.2f, 0.5f, 0.8f, 1.0f);
-                drawList.AddRectFilled(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(color));
+                drawList.AddRectFilled(min, new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(color));
 
                 // Draw border
-                drawList.AddRect(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)));
+                drawList.AddRect(min, new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)));
 
                 // Draw screen label
                 var label = $"{screenIndex + 1}";
                 if (screen.Primary)
                     label += " (Primary)";
-
+                   
                 var textSize = ImGui.CalcTextSize(label);
                 var textPos = new Vector2(x + (width - textSize.X) * 0.5f, y + (height - textSize.Y) * 0.75f);
                 drawList.AddText(textPos, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), label);
@@ -366,7 +369,9 @@ internal sealed class ScreenManager : Window
 
         // Display spanning information
         var spanningBounds = UserSettings.Config.OutputArea;
-        ImGui.Text($"Output Window spanning area: X={spanningBounds.X:0} Y={spanningBounds.Y:0} " +
+        //ImGui.Text($"Output Window spanning area:/n X={spanningBounds.X:0} Y={spanningBounds.Y:0} " +
+                  // $"Width={spanningBounds.Z:0} Height={spanningBounds.W:0}");
+        ImGui.TextWrapped($"Output Window spanning area:\n X={spanningBounds.X:0} Y={spanningBounds.Y:0} " +
                    $"Width={spanningBounds.Z:0} Height={spanningBounds.W:0}");
 
         // Add a button to reset to primary screen
