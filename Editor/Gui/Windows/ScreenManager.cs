@@ -34,8 +34,8 @@ internal sealed class ScreenManager : Window
 
     private static void DrawInnerContent()
     {
-        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(5, 5));
-        ImGui.AlignTextToFramePadding();
+        /*ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(5, 5));
+        ImGui.AlignTextToFramePadding();*/
         ImGui.Text("Display Layout: ");
         ImGui.SameLine();
         if (ImGui.Button("Open Windows settings"))
@@ -43,39 +43,38 @@ internal sealed class ScreenManager : Window
             OpenWindowsDisplaySettings();
         }
         CustomComponents.TooltipForLastItem("Open Windows display settings to configure screen arrangement, resolution, etc.");
-        ImGui.PopStyleVar();
+       // ImGui.PopStyleVar();
         FormInputs.AddVerticalSpace(5);
 
         var screens = Screen.AllScreens;
 
         // Draw visual screen layout
         FormInputs.AddVerticalSpace(10);
-        if (ImGui.CollapsingHeader("Output Window Configuration", ImGuiTreeNodeFlags.DefaultOpen))
+        /*ImGui.AlignTextToFramePadding();
+        ImGui.Text("The Output Window (Viewer) displays your piece of art.");
+        ImGui.Text("Enable it and select which screens it should span across.");
+        FormInputs.AddVerticalSpace(5);*/
+
+        var secondOutput = WindowManager.ShowSecondaryRenderWindow;
+        if (ImGui.Checkbox("Enable Output Window", ref secondOutput))
         {
-            ImGui.Text("The Output Window (Viewer) displays your rendered content.");
-            ImGui.Text("Enable it and select which screens it should span across.");
-            FormInputs.AddVerticalSpace(5);
-
-            var secondOutput = WindowManager.ShowSecondaryRenderWindow;
-            if (ImGui.Checkbox("Enable Output Window", ref secondOutput))
+            WindowManager.ShowSecondaryRenderWindow = secondOutput;
+            if (secondOutput)
             {
-                WindowManager.ShowSecondaryRenderWindow = secondOutput;
-                if (secondOutput)
-                {
-                    // When enabling, apply current spanning settings
-                    ProgramWindows.UpdateViewerWindowState();
-                }
+                // When enabling, apply current spanning settings
+                ProgramWindows.UpdateViewerWindowState();
             }
-
-            FormInputs.AddVerticalSpace(10);
-            DrawScreenLayout(screens);
-            ShowAvailableScreensInformation(screens);
         }
+
+        FormInputs.AddVerticalSpace(10);
+        DrawScreenLayout(screens);
+        ShowAvailableScreensInformation(screens);
+        
     }
 
     private static void ShowAvailableScreensInformation(Screen[] screens)
     {
-        if (ImGui.CollapsingHeader("Available Screens", ImGuiTreeNodeFlags.DefaultOpen))
+        if (ImGui.CollapsingHeader("Available Screens details", ImGuiTreeNodeFlags.CollapsingHeader))
         {
             // Display screen information in tree nodes
             for (var i = 0; i < screens.Length; i++)
@@ -139,6 +138,7 @@ internal sealed class ScreenManager : Window
         // Create a child window for the interactive elements to ensure proper hit testing
         ImGui.BeginChild("Editor screen selection", neededArea);
         {
+        
             foreach (var screen in screens)
             {
                 var bounds = screen.Bounds;
@@ -207,40 +207,39 @@ internal sealed class ScreenManager : Window
                 }
                 ImGui.PopID();
 
+            }
+                //Draw all the screen rectangles and labels
+            foreach (var screen in screens)
+            {
+                var bounds = screen.Bounds;
+                var screenIndex = Array.IndexOf(screens, screen);
 
+                // Calculate scaled position and size relative to overall bounds
+                var x = canvasPos.X + centerOffsetX + (bounds.X - overallBounds.X) * finalScale;
+                var y = canvasPos.Y + (bounds.Y - overallBounds.Y) * finalScale;
+                var width = bounds.Width * finalScale;
+                var height = bounds.Height * finalScale;
 
+                // Draw screen rectangle
+                var color = screen.Primary ? new Vector4(0.2f, 0.8f, 0.2f, 1.0f) : new Vector4(0.2f, 0.5f, 0.8f, 1.0f);
+                drawList.AddRectFilled(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(color));
+
+                // Draw border
+                drawList.AddRect(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)));
+
+                // Draw screen label
+                var label = $"{screenIndex + 1}";
+                if (screen.Primary)
+                    label += " (Primary)";
+
+                var textSize = ImGui.CalcTextSize(label);
+                var textPos = new Vector2(x + (width - textSize.X) * 0.5f, y + (height - textSize.Y) * 0.75f);
+                drawList.AddText(textPos, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), label);
             }
         }
         ImGui.EndChild();
 
-        //Draw all the screen rectangles and labels
-        foreach (var screen in screens)
-        {
-            var bounds = screen.Bounds;
-            var screenIndex = Array.IndexOf(screens, screen);
-
-            // Calculate scaled position and size relative to overall bounds
-            var x = canvasPos.X + centerOffsetX + (bounds.X - overallBounds.X) * finalScale;
-            var y = canvasPos.Y + (bounds.Y - overallBounds.Y) * finalScale;
-            var width = bounds.Width * finalScale;
-            var height = bounds.Height * finalScale;
-
-            // Draw screen rectangle
-            var color = screen.Primary ? new Vector4(0.2f, 0.8f, 0.2f, 1.0f) : new Vector4(0.2f, 0.5f, 0.8f, 1.0f);
-            drawList.AddRectFilled(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(color));
-
-            // Draw border
-            drawList.AddRect(new Vector2(x, y), new Vector2(x + width, y + height), ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)));
-
-            // Draw screen label
-            var label = $"{screenIndex + 1}";
-            if (screen.Primary)
-                label += " (Primary)";
-
-            var textSize = ImGui.CalcTextSize(label);
-            var textPos = new Vector2(x + (width - textSize.X) * 0.5f, y + (height - textSize.Y) * 0.75f);
-            drawList.AddText(textPos, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), label);
-        }
+        
 
         // Calculate the scaled spanning area relative to overall bounds
         var scaledSpanning = new Vector4(
@@ -323,7 +322,7 @@ internal sealed class ScreenManager : Window
         }
 
         // Show overlap warning dialog
-        if (_showOverlapWarning)
+       /* if (_showOverlapWarning)
         {
             ImGui.OpenPopup("Overlap Warning");
         }
@@ -356,7 +355,7 @@ internal sealed class ScreenManager : Window
             }
 
             ImGui.EndPopup();
-        }
+        }*/
 
         FormInputs.AddVerticalSpace(10);
 
