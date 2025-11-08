@@ -16,7 +16,7 @@
     },
     {
       "Id": "5008e9b4-083a-4494-8f7c-50fe5d80fc35"/*Size*/,
-      "DefaultValue": 50.0
+      "DefaultValue": 150.0
     },
     {
       "Id": "7094d22f-dcf9-4fd0-9570-7243e3284cf4"/*OffsetBaseLine*/,

@@ -75,7 +75,8 @@
         "Y": 45.0
       },
       "AddPadding": "True",
-      "Usage": "FilePath"
+      "Usage": "FilePath",
+      "FileFilter": "Fonts (*.fnt)|*.fnt"
     },
     {
       "InputId": "f2dd87b1-7f37-4b02-871b-b2e35972f246"/*Text*/,
