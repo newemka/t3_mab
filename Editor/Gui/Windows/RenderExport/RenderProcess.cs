@@ -100,7 +100,7 @@ internal static class RenderProcess
 
         var duration = Playback.RunTimeInSecs - _exportStartedTime;
         var successful = success ? "successfully" : "unsuccessfully";
-        LastHelpString = $"Render finished {successful} in {StringUtils.HumanReadableDurationFromSeconds(duration)}";
+        LastHelpString = $"Render {GetTargetFilePath(_renderSettings.RenderMode)} finished {successful} in {StringUtils.HumanReadableDurationFromSeconds(duration)}";
         Log.Debug(LastHelpString);
 
         if (_renderSettings.AutoIncrementVersionNumber && success && _renderSettings.RenderMode == RenderSettings.RenderModes.Video)
@@ -118,9 +118,8 @@ internal static class RenderProcess
             return;
         }
         
-        
-        var targetPath = GetTargetPath(renderSettings.RenderMode);
-        if (!RenderPaths.ValidateOrCreateTargetFolder(targetPath))
+        var targetFilePath = GetTargetFilePath(renderSettings.RenderMode);
+        if (!RenderPaths.ValidateOrCreateTargetFolder(targetFilePath))
             return;
 
         IsToollRenderingSomething = true;
@@ -135,7 +134,7 @@ internal static class RenderProcess
 
         if (_renderSettings.RenderMode == RenderSettings.RenderModes.Video)
         {
-            _videoWriter = new Mp4VideoWriter(targetPath, MainOutputSize, _renderSettings.ExportAudio)
+            _videoWriter = new Mp4VideoWriter(targetFilePath, MainOutputSize, _renderSettings.ExportAudio)
                                {
                                    Bitrate = _renderSettings.Bitrate,
                                    Framerate = (int)renderSettings.Fps
@@ -143,7 +142,7 @@ internal static class RenderProcess
         }
         else
         {
-            _targetFolder = targetPath;
+            _targetFolder = targetFilePath;
         }
 
         ScreenshotWriter.ClearQueue();
@@ -157,7 +156,7 @@ internal static class RenderProcess
     private static int GetRealFrame() => _frameIndex - MfVideoWriter.SkipImages;
     
     
-    private static string GetTargetPath(RenderSettings.RenderModes renderMode)
+    private static string GetTargetFilePath(RenderSettings.RenderModes renderMode)
     {
         return renderMode == RenderSettings.RenderModes.Video
                    ? RenderPaths.ResolveProjectRelativePath(UserSettings.Config.RenderVideoFilePath)

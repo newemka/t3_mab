@@ -212,7 +212,7 @@ internal static class Icons
             new(Icon.Pipette, 80),
             new(Icon.Link, 81),
             new(Icon.PopUp, slotIndex: 82),
-            // Intentionally left black
+            new(Icon.OpenExternally, slotIndex: 83),
             new(Icon.SidePanelRight, slotIndex: 84),
             new(Icon.SidePanelLeft, slotIndex: 85),
             new(Icon.Hub, slotIndex: 86),
@@ -397,5 +397,6 @@ public enum Icon
     Stack,
     CameraSpeed,
     RenderAnimation,
-    TixlLogo
+    TixlLogo,
+    OpenExternally
 }
