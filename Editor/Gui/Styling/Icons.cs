@@ -203,10 +203,11 @@ internal static class Icons
             new(Icon.Move, 71),
             new(Icon.Scale, 72),
             new(Icon.Rotate, 73),
+            new(Icon.RenderAnimation, 74),
             new(Icon.Snapshot, 75),
             new(Icon.Camera, 76),
             new(Icon.CameraSpeed, 77),
-            new(Icon.RenderAnimation, 78),
+            new(Icon.TixlLogo, 78),
             new(Icon.PlayOutput, 79),
             new(Icon.Pipette, 80),
             new(Icon.Link, 81),
@@ -395,5 +396,6 @@ public enum Icon
     ViewCanvas,
     Stack,
     CameraSpeed,
-    RenderAnimation
+    RenderAnimation,
+    TixlLogo
 }

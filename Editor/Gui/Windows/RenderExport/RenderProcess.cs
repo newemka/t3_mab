@@ -19,7 +19,8 @@ internal static class RenderProcess
     
     public static Type? MainOutputType { get; private set; }
     public static Int2 MainOutputSize;
-
+    public static Texture2D? MainOutputTexture;
+    
     public static States State;
 
     // TODO: clarify the difference
@@ -49,8 +50,8 @@ internal static class RenderProcess
             return;
         }
 
-        _mainTexture = outputWindow.GetCurrentTexture();
-        if (_mainTexture == null)
+        MainOutputTexture = outputWindow.GetCurrentTexture();
+        if (MainOutputTexture == null)
         {
             State = States.NoValidOutputTexture;
             return;
@@ -63,7 +64,7 @@ internal static class RenderProcess
             return;
         }
         
-        var desc = _mainTexture.Description;
+        var desc = MainOutputTexture.Description;
         MainOutputSize.Width = desc.Width;
         MainOutputSize.Height = desc.Height;
 
@@ -99,7 +100,8 @@ internal static class RenderProcess
 
         var duration = Playback.RunTimeInSecs - _exportStartedTime;
         var successful = success ? "successfully" : "unsuccessfully";
-        LastHelpString = $"Render finished {successful} in {StringUtils.HumanReadableDurationFromSeconds(duration)}\n Ready to render.";
+        LastHelpString = $"Render finished {successful} in {StringUtils.HumanReadableDurationFromSeconds(duration)}";
+        Log.Debug(LastHelpString);
 
         if (_renderSettings.AutoIncrementVersionNumber && success && _renderSettings.RenderMode == RenderSettings.RenderModes.Video)
             RenderPaths.TryIncrementVideoFileNameInUserSettings();
@@ -193,7 +195,7 @@ internal static class RenderProcess
 
         try
         {
-            _videoWriter?.ProcessFrames( _mainTexture, ref audioFrame, channels, sampleRate);
+            _videoWriter?.ProcessFrames( MainOutputTexture, ref audioFrame, channels, sampleRate);
             _frameIndex++;
             RenderTiming.SetPlaybackTimeForFrame(ref _renderSettings, _frameIndex, _frameCount, ref _runtime);
             return true;
@@ -214,12 +216,12 @@ internal static class RenderProcess
 
     private static bool SaveImageFrameAndAdvance()
     {
-        if (_mainTexture == null)
+        if (MainOutputTexture == null)
             return false;
         
         try
         {
-            var success = ScreenshotWriter.StartSavingToFile(_mainTexture, GetSequenceFilePath(), _renderSettings.FileFormat);
+            var success = ScreenshotWriter.StartSavingToFile(MainOutputTexture, GetSequenceFilePath(), _renderSettings.FileFormat);
             _frameIndex++;
             RenderTiming.SetPlaybackTimeForFrame(ref _renderSettings, _frameIndex, _frameCount, ref _runtime);
             return success;
@@ -238,7 +240,7 @@ internal static class RenderProcess
     private static double _exportStartedTime;
     private static int _frameIndex;
     private static int _frameCount;
-    private static Texture2D? _mainTexture;
+    
 
     private static RenderSettings _renderSettings = null!;
     private static RenderTiming.Runtime _runtime;

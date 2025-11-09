@@ -1,7 +1,9 @@
 using ImGuiNET;
 using System.IO;
 using T3.Core.DataTypes;
+using T3.Core.IO;
 using T3.Core.Operator;
+using T3.Core.Utils;
 using T3.Editor.Gui.Interaction;
 using T3.Editor.Gui.Interaction.Keyboard;
 using T3.Editor.Gui.OutputUi;
@@ -153,7 +155,7 @@ internal sealed class OutputWindow : Window
 
     private void DrawToolbar(Type drawnType)
     {
-        // Set cursor to top of window
+        // Set cursor to top of the window
         ImGui.SetCursorPos(ImGui.GetWindowContentRegionMin());
 
         // Calculate available width
@@ -291,38 +293,76 @@ internal sealed class OutputWindow : Window
 
         ResolutionHandling.DrawSelector(ref _selectedResolution, _resolutionDialog);
 
-        // Screenshot
+        // Screenshot and Render
+        if (RenderProcess.State != RenderProcess.States.NoValidOutputType && RenderProcess.State != RenderProcess.States.NoOutputWindow)
         {
-            var texture = GetCurrentTexture();
-            if (drawnType == typeof(Texture2D) || drawnType == typeof(Command))
+            //var texture = GetCurrentTexture();
+            //if (drawnType == typeof(Texture2D) || drawnType == typeof(Command))
+            //{
+            ImGui.SameLine(0, 2);
+
+            var project = ProjectView.Focused?.OpenedProject;
+            var projectFolder = project.Package.Folder;
+            var folder = Path.Combine(projectFolder, "Screenshots");
+
+            var screenshotState = !RenderProcess.IsExporting && RenderProcess.MainOutputType != null
+                                      ? CustomComponents.ButtonStates.Normal
+                                      : CustomComponents.ButtonStates.Disabled;
+
+            if (CustomComponents.IconButton(Icon.Snapshot, Vector2.Zero, screenshotState))
             {
-                ImGui.SameLine();
-
-                var project = ProjectView.Focused?.OpenedProject;
-                var projectFolder = project.Package.Folder;
-                var folder = Path.Combine(projectFolder, "Screenshots");
-
-                if (CustomComponents.IconButton(Icon.Snapshot, Vector2.Zero))
+                if (RenderProcess.MainOutputTexture != null)
                 {
                     if (!Directory.Exists(folder))
-                    {
                         Directory.CreateDirectory(folder);
-                    }
 
                     var filename = Path.Join(folder, $"{DateTime.Now:yyyy_MM_dd-HH_mm_ss_fff}.png");
-                    ScreenshotWriter.StartSavingToFile(texture, filename, ScreenshotWriter.FileFormats.Png);
+                    ScreenshotWriter.StartSavingToFile(RenderProcess.MainOutputTexture, filename, ScreenshotWriter.FileFormats.Png);
                     Log.Debug("Screenshot saved in: " + folder);
                 }
+            }
 
-                CustomComponents.TooltipForLastItem("Save screenshot");
-                
-                ImGui.SameLine();
+            CustomComponents.TooltipForLastItem("Save screenshot");
 
-                if (CustomComponents.IconButton(Icon.RenderAnimation, Vector2.Zero))
+            ImGui.SameLine();
+
+            var renderAnimState = RenderProcess.IsExporting
+                                      ? CustomComponents.ButtonStates.NeedsAttention
+                                      : RenderProcess.MainOutputType != null
+                                          ? CustomComponents.ButtonStates.Normal
+                                          : CustomComponents.ButtonStates.Disabled;
+
+            if (CustomComponents.IconButton(Icon.RenderAnimation, Vector2.Zero, renderAnimState))
+            {
+                if (RenderProcess.IsExporting)
                 {
-                    WindowManager.ToggleInstanceVisibility<RenderWindow>();
+                    RenderProcess.Cancel();
                 }
+                else
+                {
+                    RenderProcess.TryStart(RenderSettings.Current);
+                }
+            }
 
+            // Small render progress bar
+            if (RenderProcess.IsExporting)
+            {
+                var dl = ImGui.GetForegroundDrawList();
+                //var p = ImGui.GetItemRectMax();
+                var p = ImGui.GetWindowPos();
+                var size = new Vector2(ImGui.GetWindowSize().X, 2);
+                dl.AddRectFilled(p, p + size, UiColors.BackgroundFull.Fade(0.4f));
+                dl.AddRectFilled(p, p + new Vector2(size.X * (float)RenderProcess.Progress, size.Y), UiColors.StatusAttention);
+                dl.AddCircle(Vector2.Zero, 200, UiColors.StatusAttention);
+
+            }
+            
+            CustomComponents.TooltipForLastItem("Render Animation");
+
+            ImGui.SameLine();
+            if (CustomComponents.IconButton(Icon.Settings2, Vector2.Zero))
+            {
+                WindowManager.ToggleInstanceVisibility<RenderWindow>();
             }
         }
 
@@ -366,7 +406,7 @@ internal sealed class OutputWindow : Window
         _evaluationContext.BackgroundColor = _backgroundColor;
 
         const string overrideSampleVariableName = "OverrideMotionBlurSamples";
-        
+
         if (RenderProcess.IsToollRenderingSomething)
         {
             // FIXME: Implement
