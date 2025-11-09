@@ -32,9 +32,9 @@ SOFTWARE.
 
 using System.Runtime.InteropServices;
 using SharpDX;
-using MF = SharpDX.MediaFoundation;
+using SharpDX.MediaFoundation;
 
-namespace T3.Editor.Gui.Windows.RenderExport;
+namespace T3.Editor.Gui.Windows.RenderExport.MF;
 
 internal struct WaveFormatExtension
 {
@@ -104,30 +104,30 @@ internal class MediaFoundationAudioWriter
     /// </summary>
     /// <param name="audioSubtype">Audio subtype - a value from the AudioSubtypes class</param>
     /// <returns>An array of available media types that can be encoded with this subtype</returns>
-    private static IEnumerable<MF.MediaType> GetOutputMediaTypes(Guid audioSubtype)
+    private static IEnumerable<MediaType> GetOutputMediaTypes(Guid audioSubtype)
     {
-        MF.Collection availableTypes;
+        Collection availableTypes;
         try
         {
-            availableTypes = MF.MediaFactory.TranscodeGetAudioOutputAvailableTypes(audioSubtype, MF.TransformEnumFlag.All, null);
+            availableTypes = MediaFactory.TranscodeGetAudioOutputAvailableTypes(audioSubtype, TransformEnumFlag.All, null);
         }
         catch (SharpDXException c)
         {
-            if (c.ResultCode.Code == MF.ResultCode.NotFound.Code)
+            if (c.ResultCode.Code == ResultCode.NotFound.Code)
             {
                 // Don't worry if we didn't find any - just means no encoder available for this type
-                //return new MF.MediaType[0];
-                return Array.Empty<MF.MediaType>();
+                //return new MediaType[0];
+                return Array.Empty<MediaType>();
             }
             throw;
         }
 
         var count = availableTypes.ElementCount;
-        var mediaTypes = new List<MF.MediaType>(count);
+        var mediaTypes = new List<MediaType>(count);
         for (var n = 0; n < count; n++)
         {
             ComObject mediaTypeObject = (ComObject)availableTypes.GetElement(n);
-            mediaTypes.Add(new MF.MediaType(mediaTypeObject.NativePointer));
+            mediaTypes.Add(new MediaType(mediaTypeObject.NativePointer));
         }
         availableTypes.Dispose();
         return mediaTypes.ToArray();
@@ -143,9 +143,9 @@ internal class MediaFoundationAudioWriter
     public static int[] GetEncodeBitrates(Guid audioSubtype, int sampleRate, int channels)
     {
         return GetOutputMediaTypes(audioSubtype)
-              .Where(mt => mt.Get(MF.MediaTypeAttributeKeys.AudioSamplesPerSecond) == sampleRate &&
-                           mt.Get(MF.MediaTypeAttributeKeys.AudioNumChannels) == channels)
-              .Select(mt => mt.Get(MF.MediaTypeAttributeKeys.AudioAvgBytesPerSecond) * 8)
+              .Where(mt => mt.Get(MediaTypeAttributeKeys.AudioSamplesPerSecond) == sampleRate &&
+                           mt.Get(MediaTypeAttributeKeys.AudioNumChannels) == channels)
+              .Select(mt => mt.Get(MediaTypeAttributeKeys.AudioAvgBytesPerSecond) * 8)
               .Distinct()
               .OrderBy(br => br)
               .ToArray();
@@ -158,12 +158,12 @@ internal class MediaFoundationAudioWriter
     /// <param name="inputFormat">Your encoder input format (used to check sample rate and channel count)</param>
     /// <param name="desiredBitRate">Your desired bitrate</param>
     /// <returns>The closest media type, or null if none available</returns>
-    private static MF.MediaType SelectMediaType(Guid audioSubtype, SharpDX.Multimedia.WaveFormat inputFormat, int desiredBitRate)
+    private static MediaType SelectMediaType(Guid audioSubtype, SharpDX.Multimedia.WaveFormat inputFormat, int desiredBitRate)
     {
         return GetOutputMediaTypes(audioSubtype)
-            .Where(mt => mt.Get(MF.MediaTypeAttributeKeys.AudioSamplesPerSecond) == inputFormat.SampleRate &&
-                mt.Get(MF.MediaTypeAttributeKeys.AudioNumChannels) == inputFormat.Channels)
-            .Select(mt => new { MediaType = mt, Delta = Math.Abs(desiredBitRate - mt.Get(MF.MediaTypeAttributeKeys.AudioAvgBytesPerSecond) * 8) })
+            .Where(mt => mt.Get(MediaTypeAttributeKeys.AudioSamplesPerSecond) == inputFormat.SampleRate &&
+                mt.Get(MediaTypeAttributeKeys.AudioNumChannels) == inputFormat.Channels)
+            .Select(mt => new { MediaType = mt, Delta = Math.Abs(desiredBitRate - mt.Get(MediaTypeAttributeKeys.AudioAvgBytesPerSecond) * 8) })
             .OrderBy(mt => mt.Delta)
             .Select(mt => mt.MediaType)
             .FirstOrDefault();
@@ -174,7 +174,7 @@ internal class MediaFoundationAudioWriter
 
     public virtual Guid AudioFormat { get; }
 
-    protected MediaFoundationAudioWriter(MF.SinkWriter sinkWriter, ref WaveFormatExtension waveFormat, int desiredBitRate = 192000)
+    protected MediaFoundationAudioWriter(SinkWriter sinkWriter, ref WaveFormatExtension waveFormat, int desiredBitRate = 192000)
     {
         var sharpWf = waveFormat.ToSharpDx();
 
@@ -183,18 +183,18 @@ internal class MediaFoundationAudioWriter
         var outputMediaType = SelectMediaType(AudioFormat, sharpWf, desiredBitRate);
         if (outputMediaType == null) throw new InvalidOperationException("No suitable encoders available");
 
-        var inputMediaType = new MF.MediaType();
+        var inputMediaType = new MediaType();
         var size = 18 + sharpWf.ExtraSize;
 
         sinkWriter.AddStream(outputMediaType, out _streamIndex);
 
-        MF.MediaFactory.InitMediaTypeFromWaveFormatEx(inputMediaType, new[] { sharpWf }, size);
+        MediaFactory.InitMediaTypeFromWaveFormatEx(inputMediaType, new[] { sharpWf }, size);
         sinkWriter.SetInputMediaType(_streamIndex, inputMediaType, null);
     }
 
-    public MF.Sample CreateSampleFromFrame(ref byte[] data)
+    public Sample CreateSampleFromFrame(ref byte[] data)
     {
-        var mediaBuffer = MF.MediaFactory.CreateMemoryBuffer(data.Length);
+        var mediaBuffer = MediaFactory.CreateMemoryBuffer(data.Length);
 
         // Write all contents to the MediaBuffer for media foundation
         int cbMaxLength = 0;
@@ -212,7 +212,7 @@ internal class MediaFoundationAudioWriter
         }
 
         // Create the sample (includes image and timing information)
-        var sample = MF.MediaFactory.CreateSample();
+        var sample = MediaFactory.CreateSample();
         sample.AddBuffer(mediaBuffer);
 
         return sample;
@@ -221,31 +221,31 @@ internal class MediaFoundationAudioWriter
 
 internal sealed class Mp3AudioWriter : MediaFoundationAudioWriter
 {
-    public Mp3AudioWriter(MF.SinkWriter sinkWriter, ref WaveFormatExtension waveFormat, int desiredBitRate = 192000)
+    public Mp3AudioWriter(SinkWriter sinkWriter, ref WaveFormatExtension waveFormat, int desiredBitRate = 192000)
         : base(sinkWriter, ref waveFormat, desiredBitRate)
     {
     }
 
-    public override Guid AudioFormat => MF.AudioFormatGuids.Mp3;
+    public override Guid AudioFormat => AudioFormatGuids.Mp3;
 }
 
 internal sealed class FlacAudioWriter : MediaFoundationAudioWriter
 {
-    public FlacAudioWriter(MF.SinkWriter sinkWriter, ref WaveFormatExtension waveFormat, int desiredBitRate = 192000)
+    public FlacAudioWriter(SinkWriter sinkWriter, ref WaveFormatExtension waveFormat, int desiredBitRate = 192000)
         : base(sinkWriter, ref waveFormat, desiredBitRate)
     {
     }
 
-    public override Guid AudioFormat => MF.AudioFormatGuids.Flac;
+    public override Guid AudioFormat => AudioFormatGuids.Flac;
 }
 
 internal sealed class AacAudioWriter : MediaFoundationAudioWriter
 {
-    public AacAudioWriter(MF.SinkWriter sinkWriter, ref WaveFormatExtension waveFormat, int desiredBitRate = 192000)
+    public AacAudioWriter(SinkWriter sinkWriter, ref WaveFormatExtension waveFormat, int desiredBitRate = 192000)
         : base(sinkWriter, ref waveFormat, desiredBitRate)
     {
     }
 
-    public override Guid AudioFormat => MF.AudioFormatGuids.Aac;
+    public override Guid AudioFormat => AudioFormatGuids.Aac;
 }
 

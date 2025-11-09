@@ -81,14 +81,15 @@ public static class T3Ui
             AudioEngine.CompleteFrame(Playback.Current, Playback.LastFrameDuration);  
         }
         ScreenshotWriter.Update();
-        
+        RenderProcess.Update();
+
         ResourceManager.RaiseFileWatchingEvents();
 
         VariationHandling.Update();
         MouseWheelFieldWasHoveredLastFrame = MouseWheelFieldHovered;
         MouseWheelFieldHovered = false;
 
-        // A work around for potential mouse capture
+        // A workaround for potential mouse capture
         DragFieldWasHoveredLastFrame = DragFieldHovered;
         DragFieldHovered = false;
         
@@ -106,6 +107,8 @@ public static class T3Ui
             MouseInput.SelectedChildId = selectedInstance?.SymbolChildId ?? Guid.Empty;
             InvalidateSelectedOpsForTransformGizmo(nodeSelection);
         }
+        
+        
 
         // Draw everything!
         ImGui.DockSpaceOverViewport();

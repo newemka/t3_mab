@@ -14,7 +14,7 @@ using T3.Core.DataTypes;
 using T3.Core.DataTypes.Vector;
 using T3.Core.Resource;
 
-namespace T3.Editor.Gui.Windows.RenderExport;
+namespace T3.Editor.Gui.Windows.RenderExport.MF;
 
 internal abstract class MfVideoWriter : IDisposable
 {
@@ -54,7 +54,7 @@ internal abstract class MfVideoWriter : IDisposable
     /// <summary>
     /// Returns true if a frame has been written
     /// </summary>
-    public bool ProcessFrames(ref Texture2D gpuTexture, ref byte[] audioFrame, int channels, int sampleRate)
+    public bool ProcessFrames( Texture2D gpuTexture, ref byte[] audioFrame, int channels, int sampleRate)
     {
         try
         {
