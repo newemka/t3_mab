@@ -68,130 +68,136 @@ internal sealed class ScreenManager : Window
 
 
         // Add some space after the visualization
-        FormInputs.AddVerticalSpace(10);
-        if (ImGui.Button("Open Windows Display settings"))
+        FormInputs.AddVerticalSpace(20);
+        var windowWidth = ImGui.GetWindowWidth() - 12;
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 5);
+        if (ImGui.Button("Windows Display settings"+new string(' ',5) ))
         {
             OpenWindowsDisplaySettings();
         }
-        ImGui.SameLine();
-        Icons.DrawAtCursor(Icon.OpenExternally);
+       // ImGui.SameLine();
+        Icons.DrawIconOnLastItem(Icon.OpenExternally, UiColors.Text,.99f);
         CustomComponents.TooltipForLastItem("Open Windows display settings to configure screen arrangement, resolution, etc.");
-
-        ImGui.Text("Select screens for Output Window:");
-        CustomComponents.TooltipForLastItem("The red rectangle represents the spanning area for the Output Window (Viewer).");
-
-        foreach (var screen in screens)
+        FormInputs.AddVerticalSpace(20);
+        if (ImGui.CollapsingHeader("Extra details and dev stuff", ImGuiTreeNodeFlags.SpanAvailWidth))
         {
-            var screenIndex = Array.IndexOf(screens, screen);
-            ImGui.PushID($"textscreen_span_{screenIndex}");
+            ImGui.Text("Select screens for Output Window:");
+            CustomComponents.TooltipForLastItem("The red rectangle represents the spanning area for the Output Window (Viewer).");
 
-            // Check if this screen is currently in the spanning area
-            var isPartOfSpanning = IsScreenInSpanningArea(screen, UserSettings.Config.OutputArea);
-            var wasPartOfSpanning = isPartOfSpanning; // Store original value
-
-            if (ImGui.Checkbox("", ref isPartOfSpanning))
+            foreach (var screen in screens)
             {
-                // Checkbox was toggled
-                if (isPartOfSpanning && !wasPartOfSpanning)
+                var screenIndex = Array.IndexOf(screens, screen);
+                ImGui.PushID($"textscreen_span_{screenIndex}");
+
+                // Check if this screen is currently in the spanning area
+                var isPartOfSpanning = IsScreenInSpanningArea(screen, UserSettings.Config.OutputArea);
+                var wasPartOfSpanning = isPartOfSpanning; // Store original value
+
+                if (ImGui.Checkbox("", ref isPartOfSpanning))
                 {
-                    // Checkbox was checked - check if main window overlaps before adding
-                    if (WouldOverlapWithMainWindow(screen, screens))
+                    // Checkbox was toggled
+                    if (isPartOfSpanning && !wasPartOfSpanning)
                     {
-                        _pendingScreenToAdd = screen;
-                        _showOverlapWarning = true;
+                        // Checkbox was checked - check if main window overlaps before adding
+                        if (WouldOverlapWithMainWindow(screen, screens))
+                        {
+                            _pendingScreenToAdd = screen;
+                            _showOverlapWarning = true;
+                        }
+                        else
+                        {
+                            // No overlap, add immediately
+                            AddScreenToSpanning(screen, screens);
+                            ApplySpanningChanges();
+                        }
                     }
-                    else
+                    else if (!isPartOfSpanning && wasPartOfSpanning)
                     {
-                        // No overlap, add immediately
-                        AddScreenToSpanning(screen, screens);
+                        // Checkbox was unchecked - remove screen from spanning
+                        RemoveScreenFromSpanning(screen, screens);
                         ApplySpanningChanges();
                     }
                 }
-                else if (!isPartOfSpanning && wasPartOfSpanning)
+
+                if (ImGui.IsItemHovered())
                 {
-                    // Checkbox was unchecked - remove screen from spanning
-                    RemoveScreenFromSpanning(screen, screens);
-                    ApplySpanningChanges();
+                    ImGui.SetTooltip($"Include Screen {screenIndex + 1} in Output Window spanning area");
+                }
+                ImGui.SameLine();
+                ImGui.Text($" Screen {screenIndex + 1}: {screen.Bounds.Width}x{screen.Bounds.Height} @ ({screen.Bounds.X},{screen.Bounds.Y})");
+                ImGui.PopID();
+            }
+
+            // Show overlap warning dialog
+            /* if (_showOverlapWarning)
+             {
+                 ImGui.OpenPopup("Overlap Warning");
+             }
+
+             if (ImGui.BeginPopupModal("Overlap Warning", ref _showOverlapWarning, ImGuiWindowFlags.AlwaysAutoResize))
+             {
+                 ImGui.Text("Warning: The selected screen(s) overlap with the Main Editor window.");
+                 ImGui.Text("This may cause the Editor interface to be covered by the Output Window.");
+                 ImGui.Spacing();
+                 ImGui.Text("Do you want to continue?");
+                 ImGui.Spacing();
+
+                 if (ImGui.Button("Yes", new Vector2(120, 0)))
+                 {
+                     if (_pendingScreenToAdd != null)
+                     {
+                         AddScreenToSpanning(_pendingScreenToAdd, screens);
+                         ApplySpanningChanges();
+                         _pendingScreenToAdd = null;
+                     }
+                     _showOverlapWarning = false;
+                     ImGui.CloseCurrentPopup();
+                 }
+                 ImGui.SameLine();
+                 if (ImGui.Button("No", new Vector2(120, 0)))
+                 {
+                     _pendingScreenToAdd = null;
+                     _showOverlapWarning = false;
+                     ImGui.CloseCurrentPopup();
+                 }
+
+                 ImGui.EndPopup();
+             }*/
+
+
+            FormInputs.AddVerticalSpace(10);
+
+            // Display current selection
+            ImGui.Text($"Selected for UI fullscreen: Screen {UserSettings.Config.FullScreenIndexMain + 1}");
+
+            ImGui.Checkbox("Enable UI fullscreen", ref UserSettings.Config.FullScreen);
+
+            // Display spanning information
+            var spanningBounds = UserSettings.Config.OutputArea;
+            //ImGui.Text($"Output Window spanning area:/n X={spanningBounds.X:0} Y={spanningBounds.Y:0} " +
+            // $"Width={spanningBounds.Z:0} Height={spanningBounds.W:0}");
+            ImGui.TextWrapped($"Output Window spanning area:\n X={spanningBounds.X:0} Y={spanningBounds.Y:0} " +
+                       $"Width={spanningBounds.Z:0} Height={spanningBounds.W:0}");
+
+            // Add a button to reset to primary screen
+            if (ImGui.Button("Reset to Primary Screen"))
+            {
+                var primaryScreenIndex = Array.FindIndex(screens, s => s.Primary);
+                if (primaryScreenIndex >= 0)
+                {
+                    UserSettings.Config.FullScreenIndexMain = primaryScreenIndex;
                 }
             }
 
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip($"Include Screen {screenIndex + 1} in Output Window spanning area");
-            }
+            // Add a button to clear all spanning selections
             ImGui.SameLine();
-            ImGui.Text($" Screen {screenIndex + 1}: {screen.Bounds.Width}x{screen.Bounds.Height} @ ({screen.Bounds.X},{screen.Bounds.Y})");
-            ImGui.PopID();
-        }
-
-        // Show overlap warning dialog
-        /* if (_showOverlapWarning)
-         {
-             ImGui.OpenPopup("Overlap Warning");
-         }
-
-         if (ImGui.BeginPopupModal("Overlap Warning", ref _showOverlapWarning, ImGuiWindowFlags.AlwaysAutoResize))
-         {
-             ImGui.Text("Warning: The selected screen(s) overlap with the Main Editor window.");
-             ImGui.Text("This may cause the Editor interface to be covered by the Output Window.");
-             ImGui.Spacing();
-             ImGui.Text("Do you want to continue?");
-             ImGui.Spacing();
-
-             if (ImGui.Button("Yes", new Vector2(120, 0)))
-             {
-                 if (_pendingScreenToAdd != null)
-                 {
-                     AddScreenToSpanning(_pendingScreenToAdd, screens);
-                     ApplySpanningChanges();
-                     _pendingScreenToAdd = null;
-                 }
-                 _showOverlapWarning = false;
-                 ImGui.CloseCurrentPopup();
-             }
-             ImGui.SameLine();
-             if (ImGui.Button("No", new Vector2(120, 0)))
-             {
-                 _pendingScreenToAdd = null;
-                 _showOverlapWarning = false;
-                 ImGui.CloseCurrentPopup();
-             }
-
-             ImGui.EndPopup();
-         }*/
-
-
-        FormInputs.AddVerticalSpace(10);
-
-        // Display current selection
-        ImGui.Text($"Selected for UI fullscreen: Screen {UserSettings.Config.FullScreenIndexMain + 1}");
-
-        ImGui.Checkbox("Enable UI fullscreen", ref UserSettings.Config.FullScreen);
-
-        // Display spanning information
-        var spanningBounds = UserSettings.Config.OutputArea;
-        //ImGui.Text($"Output Window spanning area:/n X={spanningBounds.X:0} Y={spanningBounds.Y:0} " +
-        // $"Width={spanningBounds.Z:0} Height={spanningBounds.W:0}");
-        ImGui.TextWrapped($"Output Window spanning area:\n X={spanningBounds.X:0} Y={spanningBounds.Y:0} " +
-                   $"Width={spanningBounds.Z:0} Height={spanningBounds.W:0}");
-
-        // Add a button to reset to primary screen
-        if (ImGui.Button("Reset to Primary Screen"))
-        {
-            var primaryScreenIndex = Array.FindIndex(screens, s => s.Primary);
-            if (primaryScreenIndex >= 0)
+            if (ImGui.Button("Clear Spanning Selection"))
             {
-                UserSettings.Config.FullScreenIndexMain = primaryScreenIndex;
+                ClearSpanningSelection();
+                ApplySpanningChanges();
             }
         }
-
-        // Add a button to clear all spanning selections
-        ImGui.SameLine();
-        if (ImGui.Button("Clear Spanning Selection"))
-        {
-            ClearSpanningSelection();
-            ApplySpanningChanges();
-        }
+        
         ImGui.Unindent(10);
     }
 
@@ -260,7 +266,7 @@ internal sealed class ScreenManager : Window
         ImGui.SetCursorScreenPos(canvasPos + new Vector2(centerOffsetX, 0));
 
         // Create a child window for the interactive elements to ensure proper hit testing
-        ImGui.BeginChild("Editor screen selection", neededArea);
+        ImGui.BeginChild("Editor screen selection", neededArea,false,ImGuiWindowFlags.NoScrollbar);
         {
             //Draw all the screen rectangles and labels
             foreach (var screen in screens)
@@ -412,14 +418,55 @@ internal sealed class ScreenManager : Window
             rectMin.X + scaledSpanning.Z,
             rectMin.Y + scaledSpanning.W
         );
-
         // Draw spanning area if defined
-        if (scaledSpanning.Z > 0 && scaledSpanning.W > 0)
+        // Count how many screens are currently selected for spanning
+        var screensInSpanning = screens.Count(screen => IsScreenInSpanningArea(screen, UserSettings.Config.OutputArea));
+
+        // Check if spanning area has gaps
+        var hasGaps = IsSpanningAreaLargerThanScreens(screens, UserSettings.Config.OutputArea);
+
+        // Draw spanning area only if more than one screen is selected AND the area is defined
+        if (screensInSpanning > 1 && scaledSpanning.Z > 0 && scaledSpanning.W > 0)
         {
-            // Draw the spanning area rectangle RED border
-            drawList.AddRect(rectMin, rectMax, UiColors.BackgroundActive, 0, ImDrawFlags.RoundCornersNone, 4);
+            // Draw the spanning area border
+            drawList.AddRect(rectMin, rectMax, UiColors.BackgroundActive.Fade(0.5f), 0, ImDrawFlags.RoundCornersNone, 2);
+
+            // Add a filled rectangle at the bottom for the label
+            var labelHeight = 20 * T3Ui.UiScaleFactor; // Height of the label area
+            var labelRectMin = new Vector2(rectMin.X, rectMax.Y);
+            var labelRectMax = new Vector2(rectMax.X, rectMax.Y + labelHeight);
+            drawList.AddRectFilled(labelRectMin, labelRectMax, UiColors.BackgroundActive.Fade(0.3f));
+
+            // Add text - show warning if there are gaps
+            ImGui.PushFont(Fonts.FontSmall);
+            string text;
+            if (hasGaps)
+            {
+                text = "Spanning (with gaps)";
+                var textSize = ImGui.CalcTextSize(text);
+                var textPos = new Vector2(
+                    labelRectMin.X + (scaledSpanning.Z - textSize.X) * 0.5f,
+                    labelRectMin.Y + (labelHeight - textSize.Y) * 0.5f
+                );
+
+                drawList.AddText(textPos, UiColors.Text, text);
+                CustomComponents.TooltipForLastItem("The spanning area includes regions not covered by any selected screen. Open Windows Display settings to arrange your screen layout.");
+            }
+            else
+            {
+                text = "Spanning";
+                var textSize = ImGui.CalcTextSize(text);
+                var textPos = new Vector2(
+                    labelRectMin.X + (scaledSpanning.Z - textSize.X) * 0.5f,
+                    labelRectMin.Y + (labelHeight - textSize.Y) * 0.5f
+                );
+
+                drawList.AddText(textPos, UiColors.Text, text);
+            }
+            ImGui.PopFont();
+
         }
-        
+
         // Set cursor position to continue after the visualization
         ImGui.SetCursorScreenPos(canvasEndPos);
 
@@ -574,6 +621,27 @@ internal sealed class ScreenManager : Window
                 }
             }
         }
+    }
+
+    private static bool IsSpanningAreaLargerThanScreens(Screen[] screens, Vector4 spanningArea)
+    {
+        if (spanningArea.Z == 0 || spanningArea.W == 0)
+            return false;
+
+        // Get all screens that are currently in the spanning area
+        var screensInSpanning = screens.Where(s => IsScreenInSpanningArea(s, spanningArea)).ToArray();
+
+        if (screensInSpanning.Length == 0)
+            return false;
+
+        // Calculate the total area of all screens in the spanning area
+        var totalScreenArea = screensInSpanning.Sum(s => s.Bounds.Width * s.Bounds.Height);
+
+        // Calculate the spanning area
+        var spanningAreaTotal = spanningArea.Z * spanningArea.W;
+
+        // If spanning area is larger than the sum of screen areas, there are gaps
+        return spanningAreaTotal > totalScreenArea;
     }
 
     private static bool _showOverlapWarning = false;
