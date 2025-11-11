@@ -29,21 +29,6 @@ internal static partial class WindowManager
                 ProgramWindows.UpdateViewerWindowState();
             }
                 
-
-           /* if (ImGui.BeginMenu("Output Window Display"))
-            {
-                for (var index = 0; index < screens.Count; index++)
-                {
-                    var screen = screens.ElementAt(index);
-                    var label = $"{screen.DeviceName.Trim('\\', '.')} ({screen.Bounds.Width}x{screen.Bounds.Height})";
-                    if (ImGui.MenuItem(label, "", index == UserSettings.Config.FullScreenIndexViewer))
-                    {
-                        UserSettings.Config.FullScreenIndexViewer = index;
-                    }
-                }
-
-                ImGui.EndMenu();
-            }*/
         }
 
         ImGui.Separator();
