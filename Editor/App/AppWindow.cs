@@ -1,17 +1,16 @@
+using System.ComponentModel;
+using System.Drawing;
+using System.IO;
+using System.Windows.Forms;
 using SharpDX;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using SharpDX.Windows;
-using System.ComponentModel;
-using System.Drawing;
-using System.IO;
-using System.Windows.Forms;
 using T3.Core.DataTypes.Vector;
 using T3.Core.Resource;
 using T3.Core.SystemUi;
 using T3.Editor.Gui.Styling;
-using T3.Editor.Gui.UiHelpers;
 using Device = SharpDX.Direct3D11.Device;
 using Icon = System.Drawing.Icon;
 using Rectangle = System.Drawing.Rectangle;
@@ -95,20 +94,6 @@ internal sealed class AppWindow
         Form.FormBorderStyle = FormBorderStyle.None;
         Form.Bounds = Screen.AllScreens[screenIndex].Bounds;
   
-    }
-
-    internal void SetViewerMode(bool spanover, Vector4 spanning)
-    {
-        
-        if (!spanover)
-        {
-            return;
-        }
-        else
-        {
-            Form.FormBorderStyle = FormBorderStyle.None;
-            Form.Bounds = new Rectangle((int)spanning.X, (int)spanning.Y, (int)spanning.Z, (int)spanning.W);
-        }
     }
 
     internal void UpdateSpanningBounds(int x, int y, int width, int height)

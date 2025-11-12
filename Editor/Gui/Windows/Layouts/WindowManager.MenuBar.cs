@@ -1,7 +1,6 @@
 #nullable enable
 using ImGuiNET;
 using T3.Editor.App;
-using T3.Editor.Gui.UiHelpers;
 using T3.Editor.SystemUi;
 
 namespace T3.Editor.Gui.Windows.Layouts;

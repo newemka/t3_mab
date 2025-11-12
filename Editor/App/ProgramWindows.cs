@@ -263,10 +263,6 @@ internal static class ProgramWindows
         Viewer.Show();
     }
 
-    /// <summary>
-    /// Updates the viewer window spanning bounds dynamically
-    /// </summary>
-
     private static void OnCloseMainWindow(object sender, CancelEventArgs args)
     {
         if (EditableSymbolProject.AllProjects.Any(x => x.IsSaving))
