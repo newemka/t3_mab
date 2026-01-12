@@ -31,6 +31,9 @@ internal sealed class ResampleLinePoints : Instance<ResampleLinePoints>
     [Input(Guid = "14524523-801d-4c70-9f42-af4f8d37be8a")]
     public readonly InputSlot<Vector3> RotationUpVector = new InputSlot<Vector3>();
 
+        [Input(Guid = "debec43a-9081-4cba-9c2d-c0654c30e80a")]
+        public readonly InputSlot<bool> FlipRecompute = new InputSlot<bool>();
+
 
     private enum SampleModes
     {

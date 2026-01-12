@@ -7,7 +7,7 @@ cbuffer Params : register(b0)
 {
     float SmoothDistance;
     float2 SampleRange;
-    float __padding;
+    float Flip;
     float3 UpVector;
 }
 
@@ -120,7 +120,7 @@ inline float4 SampleRotationAtF(float f)
         maxPos /= stepSize;
 
         float3 tangent = normalize(minPos - maxPos);
-        ResultPoints[i.x].Rotation = qLookAt(tangent, UpVector);
+        ResultPoints[i.x].Rotation = qLookAt(Flip*tangent, UpVector);
     }
     else
     {

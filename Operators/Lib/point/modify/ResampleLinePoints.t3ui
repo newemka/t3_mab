@@ -66,6 +66,14 @@
       "ClampMax": true
     },
     {
+      "InputId": "debec43a-9081-4cba-9c2d-c0654c30e80a"/*FlipRecompute*/,
+      "Position": {
+        "X": -580.3513,
+        "Y": 1014.5936
+      },
+      "Description": "Flip the direction for recompute, useful for [ExtrudeCurves]"
+    },
+    {
       "InputId": "e731ef71-b172-4308-b7d2-a59fa55b266a"/*Count*/,
       "Position": {
         "X": -551.46265,
@@ -87,6 +95,13 @@
       "Position": {
         "X": 471.04163,
         "Y": 587.7994
+      }
+    },
+    {
+      "ChildId": "1cc2d780-78f6-43df-9977-19b3aca703f1"/*BoolToFloat*/,
+      "Position": {
+        "X": -346.02942,
+        "Y": 1059.9406
       }
     },
     {
@@ -135,8 +150,8 @@
     {
       "ChildId": "a220297c-7c17-4461-94e2-a40e8fc3e13a"/*__padding*/,
       "Position": {
-        "X": -148.51068,
-        "Y": 793.5625
+        "X": -240.1117,
+        "Y": 939.57996
       }
     },
     {
