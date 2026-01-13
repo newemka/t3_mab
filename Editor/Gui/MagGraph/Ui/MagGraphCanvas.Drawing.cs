@@ -107,10 +107,14 @@ internal sealed partial class MagGraphView
                 _context.ActiveTargetInputId = Guid.Empty;
             }
 
-            if (!UserSettings.Config.FocusMode)
+            if (UserSettings.Config.CanvasGrid)
             {
-                DrawBackgroundGrids(drawList);
+                if (!UserSettings.Config.FocusMode)
+                {
+                    DrawBackgroundGrids(drawList);
+                }
             }
+            
 
             // Selection fence...
             if (!_context.PreventInteraction)

@@ -122,6 +122,14 @@ internal sealed class SettingsWindow : Window
                                                      ref UserSettings.Config.MaxSegmentCount, 1, 100, 1f,
                                                      "Controls the number of segments used to draw connections between operators.",
                                                      UserSettings.Defaults.MaxSegmentCount);
+                        changed |= FormInputs.AddCheckBox("Make Ops Square",
+                                                          ref UserSettings.Config.OpSquare,
+                                                          "Makes Ops Square Edged, keep it disabled for better visual feedback.",
+                                                          UserSettings.Defaults.OpSquare);
+                        changed |= FormInputs.AddCheckBox("Canvas Grid",
+                                                          ref UserSettings.Config.CanvasGrid,
+                                                          "Displays the canvas grid",
+                                                          UserSettings.Defaults.CanvasGrid);
                     }
                     else
                     {
