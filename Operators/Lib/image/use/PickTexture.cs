@@ -7,10 +7,14 @@ internal sealed class PickTexture : Instance<PickTexture>
 {
     [Output(Guid = "D2F29AC9-EC9E-43AB-8F3F-2C4CD7FC9444")]
     public readonly Slot<Texture2D> Selected = new();
+    
+    [Output(Guid = "BB481E61-C35A-4C2A-84F8-8DB028352540")]
+    public readonly Slot<int> ActiveIndex = new();
 
     public PickTexture()
     {
         Selected.UpdateAction += Update;
+        ActiveIndex.UpdateAction += Update;
     }
 
     private void Update(EvaluationContext context)
@@ -22,7 +26,8 @@ internal sealed class PickTexture : Instance<PickTexture>
 
         var index = Index.GetValue(context).Mod(connections.Count);
         Selected.Value = connections[index].GetValue(context);
-        
+        ActiveIndex.Value = index;
+
         // Clear dirty flag
         if (_isFirstUpdate)
         {

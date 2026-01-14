@@ -26,7 +26,10 @@ internal static class PickTextureUi
         internal readonly InputSlot<int> Index = null!;
 
         [BindInput("6C935163-1729-4DF0-A981-610B4AA7C6A3")]
-        internal readonly MultiInputSlot<Texture2D> Inputs = null!;        
+        internal readonly MultiInputSlot<Texture2D> Inputs = null!;
+
+        [BindOutput("BB481E61-C35A-4C2A-84F8-8DB028352540")]
+        internal readonly Slot<int> ActiveIndex = null!;
     }
 
     internal static OpUi.CustomUiResult DrawChildUi(Instance instance,
@@ -49,6 +52,10 @@ internal static class PickTextureUi
         // Current index
         var isAnimated = instance.Parent?.Symbol.Animator.IsInputSlotAnimated(data.Index) ?? false;
         var indexIsConnected = data.Index.HasInputConnections;
+        
+        var activeIndexIsConnected = data.ActiveIndex.UpdateAction != null &&
+                                     data.ActiveIndex.UpdateAction != data.ActiveIndex.Update;
+
         var currentValue = (isAnimated || indexIsConnected)
                                ? data.Index.Value
                                : data.Index.TypedInputValue.Value;
@@ -73,7 +80,8 @@ internal static class PickTextureUi
 
             var buttonAreaHeight = workingRect.GetHeight();
 
-            if (indexIsConnected)
+
+            if (indexIsConnected || activeIndexIsConnected)
             {
                 buttonAreaHeight -= spaceForIndex;
             }
@@ -144,7 +152,7 @@ internal static class PickTextureUi
             DrawMultiInputRegion(drawList, workingRect, buttonAreaHeight, canvasScaleY, anchorColor);
             // Draw current index text if connected
 
-            if (indexIsConnected)
+            if (indexIsConnected || activeIndexIsConnected)
             {
                 var indexText = $"Index: {currentValue}";
                 var titlePos = new Vector2(workingRect.Min.X + margin, workingRect.Max.Y - buttonHeight/2);
