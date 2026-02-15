@@ -1,3 +1,5 @@
+using T3.Core.Rendering;
+
 namespace Lib.point.generate;
 
 [Guid("2467e1ed-f7fc-4c90-8230-b80ba6b42a2d")]
@@ -15,4 +17,13 @@ internal sealed class MeshVerticesToPoints : Instance<MeshVerticesToPoints>
 
     [Input(Guid = "664b9a97-0709-40d5-b0a0-651092e658af")]
     public readonly InputSlot<Vector3> OffsetByTBN = new InputSlot<Vector3>();
+
+        [Input(Guid = "0c271c0d-11a3-4704-a3ac-4bd5c5f4241f", MappedType = typeof(Fx))]
+    public readonly InputSlot<int> SelectedTo = new InputSlot<int>();
+
+    private enum Fx
+    {
+        F1 = 0,
+        F2 = 1
+    }
 }
