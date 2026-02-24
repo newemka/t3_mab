@@ -41,27 +41,11 @@ cbuffer Params : register(b1)
     float4 Color;
     float4 Shadow;
     float Sharpness;
+    float BillboardMode; 
 };
 
 struct GridEntry
 {
-    // float2 gridPos;
-    // float2 charUv;
-    // float highlight;
-    // float3 __filldummy;
-    //float2 size;
-    //float2 __filldummy;
-
-    // float3 Position;
-    // float Size;
-    // float3 Orientation;
-    // float AspectRatio;
-    // float4 Color;
-    // float4 UvMinMax;
-    // float BirthTime;
-    // float Speed;
-    // uint Id;        
-
     float3 Position;     
     float Size;             // 3
     float AspectRatio;      // 4
@@ -84,7 +68,6 @@ StructuredBuffer<GridEntry> GridEntries : t0;
 Texture2D<float4> fontTexture : register(t1);
 sampler texSampler : register(s0);
 
-
 Output vsMain(uint id: SV_VertexID)
 {
     Output output;
@@ -93,33 +76,52 @@ Output vsMain(uint id: SV_VertexID)
     int entryIndex = id / 6;
     float3 quadPos = Quad[vertexIndex];
 
-
     GridEntry entry = GridEntries[entryIndex];
 
-
-    float3 posInObject = entry.Position;
-    posInObject.xy += quadPos.xy * float2(entry.Size * entry.AspectRatio, entry.Size);
-
-    // Experimenting with aligned font scaling (not working)
-    // float2 posInQuad = quadPos.xy * float2(entry.Size * entry.AspectRatio, entry.Size);
-    // posInQuad -= entry.Offset / 1024 * TestParams.x + float2(0.5 * entry.AspectRatio, -0.22) * TestParams.z;
-    // posInQuad *= TestParams.y;
-    // posInQuad += entry.Offset / 1024 * TestParams.x - float2(0.25 * entry.AspectRatio, -1.22) * TestParams.z * TestParams.y;
-    // posInQuad -= 0.08;
-    // float3 posInObject = float3(posInQuad,0) + entry.Position;
-
-
-    float4 quadPosInWorld = mul(float4(posInObject.xyz,1), ObjectToWorld);
+    // First, get the letter's position in object space
+    float3 letterPos = entry.Position;
     
-    //quadPosInWorld.xy += quadPos.xy * float2(entry.Size * entry.AspectRatio, entry.Size) ; //CellSize *  (1- CellPadding) * (1+overrideScale* OverrideScale) /2;
+    // Add the quad offset to create the vertex position in object space
+    float3 vertexPos = letterPos;
+    vertexPos.xy += quadPos.xy * float2(entry.Size * entry.AspectRatio, entry.Size);
     
-    float4 quadPosInCamera = mul(quadPosInWorld, WorldToCamera);
+    float4 worldPos;
+    
+    if (BillboardMode > 0.5) // Billboard mode 
+    {
+        float4 layoutCenter = float4(0, 0, 0, 1);
+        float4 worldCenter = mul(layoutCenter, ObjectToWorld);
+        float3 localOffset = letterPos;
+        
+        // Add the quad offset to the letter offset
+        localOffset.xy += quadPos.xy * float2(entry.Size * entry.AspectRatio, entry.Size);      
+        
+        // Create billboard rotation matrix
+        float3 zAxis = normalize(CameraToWorld[2].xyz);
+        float3 xAxis = normalize(cross(float3(0, 1, 0), zAxis));
+        float3 yAxis = cross(zAxis, xAxis);
+        
+        float3x3 billboardRot = float3x3(
+            xAxis,    yAxis, zAxis
+        );
+        
+        // Rotate the local offset
+        float3 rotatedOffset = mul(localOffset, billboardRot);
+        
+        // Final world position = world center + rotated offset
+        worldPos = float4(worldCenter.xyz + rotatedOffset, 1);
+    }
+    else
+    {
+        worldPos = mul(float4(vertexPos, 1), ObjectToWorld);
+    }
+    
+    float4 quadPosInCamera = mul(worldPos, WorldToCamera);
     output.position = mul(quadPosInCamera, CameraToClipSpace);
-    //output.position.z = 0;
-    //output.color = lerp(Color, HighlightColor, entry.highlight) * overrideBrightness;
-    //output.texCoord = (entry.charUv + quadPos * float2(0.5, -0.5) + 0.5)/16;
+
     float4 uv = entry.UvMinMax * UV[vertexIndex];
-    output.texCoord =  uv.xy + uv.zw;
+    output.texCoord = uv.xy + uv.zw;
+    
     return output;
 }
 
@@ -137,28 +139,14 @@ float median(float r, float g, float b) {
 
 float4 psMain(PsInput input) : SV_TARGET
 {    
-    //float2 msdfUnit = float2(1,1) * 1;// pxRange/float2(textureSize(msdf, 0));
+    
     float3 smpl1 =  fontTexture.Sample(texSampler, input.texCoord).rgb;
-    //return float4(smpl1,1);
-    // float sigDist1 = median(smpl1.r, smpl1.g, smpl1.b) - 0.0001;
-    // float opacity1 = smoothstep(0.0,0.9,sigDist1*sigDist1);
-    //return float4(opacity1.xxx,1);
-
-    int height, width;
-    fontTexture.GetDimensions(width,height);
-
-    // from https://github.com/Chlumsky/msdfgen/issues/22#issuecomment-234958005
-
-    float2 dx2 = abs(ddx( input.texCoord.xy ) * width);
-    float2 dy2 = abs(ddy( input.texCoord.xy ) * height);
-    float dx= max(dx2.x, dx2.y);
-    float dy= max(dy2.x, dy2.y);
-    float edge = rsqrt( dx * dx + dy * dy );
-
-    float toPixels = Sharpness * edge ;
+   
     float sigDist = median( smpl1.r, smpl1.g, smpl1.b ) - 0.5;
+    float pxDist = fwidth(sigDist);
+    float toPixels = Sharpness / max(pxDist, 1e-5);
+    
     float letterShape = clamp( sigDist * toPixels + 0.5, 0.0, 1.0 );
-
 
     if(Shadow.a < 0.01) {
         return float4(Color.rgb, letterShape * Color.a);

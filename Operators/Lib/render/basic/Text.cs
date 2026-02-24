@@ -67,6 +67,9 @@ internal sealed class Text : Instance<Text>, ITransformable
     [Input(Guid = "7a76d5aa-1f44-4238-9333-7c2951becc31")]
     public readonly InputSlot<bool> EnableZTest = new InputSlot<bool>();
 
-        [Input(Guid = "356cbd6c-2e6a-4a3e-992f-943dd420a53f")]
-        public readonly InputSlot<int> Sharpness = new InputSlot<int>();
+        [Input(Guid = "09958bba-42da-488e-ae20-84c60933d01d")]
+        public readonly InputSlot<float> Sharpness = new();
+
+        [Input(Guid = "a0cb1c9c-76b2-46fd-9419-e0ab0606fdcb")]
+        public readonly InputSlot<bool> Billboard = new();
 }

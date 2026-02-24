@@ -4,6 +4,16 @@
   "SymbolTags": "1",
   "InputUis": [
     {
+      "InputId": "09958bba-42da-488e-ae20-84c60933d01d"/*Sharpness*/,
+      "Position": {
+        "X": -73.0488,
+        "Y": 924.869
+      },
+      "Min": 0.01,
+      "Max": 1.0,
+      "ClampMin": true
+    },
+    {
       "InputId": "0e5f05b4-5e8a-4f6d-8cac-03b04649eb67"/*Color*/,
       "Position": {
         "X": -266.3731,
@@ -21,21 +31,10 @@
       "Description": "Defines whether / which surface is rendered invisible"
     },
     {
-      "InputId": "356cbd6c-2e6a-4a3e-992f-943dd420a53f"/*Sharpness*/,
-      "Position": {
-        "X": -295.75763,
-        "Y": 687.47797
-      },
-      "Description": "Adjust the edges, lower this value if the render is aliased.",
-      "Min": 1,
-      "Max": 16,
-      "ClampMin": true
-    },
-    {
       "InputId": "50c9ab21-39f4-4e92-b5a7-ad9e60ae6ec3"/*FontPath*/,
       "Position": {
-        "X": 252.9892,
-        "Y": 818.09973
+        "X": 160.9837,
+        "Y": 852.071
       },
       "GroupTitle": "Font & Size",
       "Description": "Defines which font is used",
@@ -76,6 +75,13 @@
         "Y": 419.70062
       },
       "Description": "Defines the color / opacity of the shadow that appears as an outline\nColors brighter than 1 create a glow effect"
+    },
+    {
+      "InputId": "a0cb1c9c-76b2-46fd-9419-e0ab0606fdcb"/*Billboard*/,
+      "Position": {
+        "X": -283.47058,
+        "Y": 776.4033
+      }
     },
     {
       "InputId": "ae7f7e83-fa18-44fd-b639-3bd0dbd3ac06"/*VerticalAlign*/,
@@ -169,6 +175,13 @@
       }
     },
     {
+      "ChildId": "11b06bd6-6fbb-44b3-956a-54c8031ccfde"/*Value*/,
+      "Position": {
+        "X": -3.0789795,
+        "Y": 711.41016
+      }
+    },
+    {
       "ChildId": "143c7600-57f9-4e58-8185-04293704d041"/*_RenderFontBuffer*/,
       "Position": {
         "X": 785.4279,
@@ -208,6 +221,13 @@
       "Position": {
         "X": 153.62689,
         "Y": 244.70062
+      }
+    },
+    {
+      "ChildId": "5ae6ac2c-b3e0-488b-91f8-10df19fc8688"/*Value*/,
+      "Position": {
+        "X": -73.0488,
+        "Y": 783.39905
       }
     },
     {
@@ -272,17 +292,10 @@
       }
     },
     {
-      "ChildId": "aa397f89-22c1-49eb-b54a-8a80482f9715"/*magic1*/,
+      "ChildId": "c1fef0ce-365d-4c3e-938a-aa452feddff6"/*BoolToFloat*/,
       "Position": {
-        "X": -83.3327,
-        "Y": 612.0588
-      }
-    },
-    {
-      "ChildId": "ad0e45c3-103c-4b8c-8e3c-6c3c2aca64a8"/*IntToFloat*/,
-      "Position": {
-        "X": 29.910736,
-        "Y": 683.2737
+        "X": -283.47058,
+        "Y": 811.4033
       }
     },
     {

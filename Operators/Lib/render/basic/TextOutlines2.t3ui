@@ -6,27 +6,22 @@
     {
       "InputId": "0abd9f81-bc91-4775-bf0e-472399b9778e"/*LineHeight*/,
       "Position": {
-        "X": -245.7945,
-        "Y": 669.3257
+        "X": -369.1305,
+        "Y": 801.9897
       }
     },
     {
-      "InputId": "1b9a9ef5-fe48-4793-b420-7718643035f0"/*Sharpness*/,
+      "InputId": "1af2fdde-877f-4d6e-91ac-1f311885a4ef"/*Sharpness*/,
       "Position": {
-        "X": -59.60559,
-        "Y": 465.3982
-      },
-      "Description": "Adjust the edges, lower this value if the render is aliased.",
-      "Min": 1,
-      "Max": 16,
-      "ClampMin": true,
-      "ClampMax": true
+        "X": 80.39441,
+        "Y": 605.3982
+      }
     },
     {
       "InputId": "21a2292d-1969-41ee-a71f-00a1621f9539"/*FontPath*/,
       "Position": {
-        "X": -484.92914,
-        "Y": 898.59204
+        "X": -608.26514,
+        "Y": 1031.2556
       },
       "GroupTitle": "Font & Size",
       "Usage": "FilePath",
@@ -49,25 +44,36 @@
     {
       "InputId": "617108fa-e7a6-478d-852b-cd5baa7d0b1c"/*HorizontalAlign*/,
       "Position": {
-        "X": -245.7945,
-        "Y": 774.3257
+        "X": -369.1305,
+        "Y": 906.9897
       }
     },
     {
       "InputId": "8efc35ee-875b-4181-aa1d-bd705f82bea9"/*InsideLine*/,
       "Position": {
         "X": 80.39441,
-        "Y": 395.3982
+        "Y": 535.3982
       }
+    },
+    {
+      "InputId": "94f826ae-4244-41e9-882e-d78fdaeed502"/*FillColor*/,
+      "Position": {
+        "X": -199.60559,
+        "Y": 395.39816
+      },
+      "Min": 0.0,
+      "Max": 1.0,
+      "ClampMin": true
     },
     {
       "InputId": "9c2089a2-266d-4022-b23d-4c67a8a19788"/*Position*/,
       "Position": {
-        "X": -245.7945,
-        "Y": 704.3257
+        "X": -369.1305,
+        "Y": 836.9897
       },
       "AddPadding": "True",
-      "Scale": 0.01
+      "Scale": 0.01,
+      "UseVec2Control": "Position"
     },
     {
       "InputId": "a827c2c6-3286-4488-9a90-ed38c4184e6a"/*CullMode*/,
@@ -81,41 +87,48 @@
       "InputId": "b15018a7-6c61-4cee-88fa-a43684ef5cc4"/*OutsideLine*/,
       "Position": {
         "X": 80.39441,
-        "Y": 430.3982
+        "Y": 570.3982
       },
       "GroupTitle": "Lines Thickness"
     },
     {
       "InputId": "b8035f87-f293-4da0-8bdc-ec75cc6252e7"/*Size*/,
       "Position": {
-        "X": -245.7945,
-        "Y": 599.3257
+        "X": -369.1305,
+        "Y": 731.9897
       },
       "Min": 0.0,
       "Max": 500.0,
       "Scale": 1.0
     },
     {
+      "InputId": "ba959318-b263-4382-a7d0-9e71e0b71fad"/*BillboardMode*/,
+      "Position": {
+        "X": -59.60559,
+        "Y": 640.3982
+      }
+    },
+    {
       "InputId": "c4b53d8f-1357-47d4-aa73-ca6d07543994"/*InputText*/,
       "Position": {
-        "X": -245.7945,
-        "Y": 529.3257
+        "X": -369.1305,
+        "Y": 661.9897
       },
       "Usage": "Multiline"
     },
     {
       "InputId": "e148fac5-d905-4e74-a958-5ed45b152ae1"/*VerticalAlign*/,
       "Position": {
-        "X": -245.7945,
-        "Y": 739.3257
+        "X": -369.1305,
+        "Y": 871.9897
       },
       "GroupTitle": "Alignment"
     },
     {
       "InputId": "e6164880-eae5-468e-8dd8-084d20918bc9"/*Spacing*/,
       "Position": {
-        "X": -245.7945,
-        "Y": 634.3257
+        "X": -369.1305,
+        "Y": 766.9897
       },
       "Min": -10.0,
       "Max": 10.0,
@@ -128,6 +141,13 @@
       "Position": {
         "X": 220.39441,
         "Y": 220.39821
+      }
+    },
+    {
+      "ChildId": "1f9a5250-7bfb-40a4-bcb9-6899d236e7b4"/*BoolToFloat*/,
+      "Position": {
+        "X": 80.39441,
+        "Y": 640.3982
       }
     },
     {
@@ -168,8 +188,8 @@
     {
       "ChildId": "4821f8dd-0b31-402b-aebb-5dd941b0e9d0"/*GetForegroundColor*/,
       "Position": {
-        "X": -199.60559,
-        "Y": 290.3982
+        "X": -483.58936,
+        "Y": 316.3091
       }
     },
     {
@@ -194,6 +214,18 @@
       }
     },
     {
+      "ChildId": "57891cb8-7abb-4534-90c1-1e218ec23326"/*Vector4Components*/,
+      "Style": "Resizable",
+      "Size": {
+        "X": 111.079544,
+        "Y": 59.905018
+      },
+      "Position": {
+        "X": 80.39441,
+        "Y": 395.39816
+      }
+    },
+    {
       "ChildId": "59994f7e-dae6-4356-89e4-d5c8d07632b3"/*SearchAndReplace*/,
       "Position": {
         "X": 216.63559,
@@ -201,10 +233,17 @@
       }
     },
     {
+      "ChildId": "5c375860-336b-48f3-8472-be922d378943"/*BlendColors*/,
+      "Position": {
+        "X": -59.60559,
+        "Y": 395.39816
+      }
+    },
+    {
       "ChildId": "6e76ff26-924a-41de-91d7-4b9a8e551a8f"/*_RenderFontBuffer*/,
       "Position": {
-        "X": -105.794495,
-        "Y": 529.3257
+        "X": -229.1305,
+        "Y": 661.9897
       }
     },
     {
@@ -212,13 +251,6 @@
       "Position": {
         "X": 411.8406,
         "Y": 503.1332
-      }
-    },
-    {
-      "ChildId": "7b93d07f-c08e-42c1-8d1d-78ceb74d5e91"/*IntToFloat*/,
-      "Position": {
-        "X": 80.39441,
-        "Y": 465.3982
       }
     },
     {
