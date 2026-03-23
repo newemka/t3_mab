@@ -36,6 +36,7 @@ cbuffer Params : register(b1)
     float TextureMode;
     float2 TextureRange;    
     float UseWAsWeight;
+    float DoubleSided;
 };
 
 cbuffer FogParams : register(b2)
@@ -68,12 +69,13 @@ struct psInput
     float3x3 tbnToWorld : TBASIS;    
     float fog:VPOS;
     float4 color: COLOR;
+    
 };
 
 sampler texSampler : register(s0);
 sampler clampedSampler : register(s1);
 
-StructuredBuffer<LegacyPoint> Points : t0;
+StructuredBuffer<Point> Points : t0;
 //Texture2D<float4> texture2 : register(t1);
 
 Texture2D<float4> BaseColorMap : register(t1);
@@ -90,66 +92,112 @@ psInput vsMain(uint id: SV_VertexID)
     Points.GetDimensions(pointCount, pointStride);
 
     psInput output;
-    float discardFactor = 1;
     int quadIndex = id % 6;
     int particleId = id / 6;
 
+    // Remap id for double sided — second half of vertices is the back face pass
+    bool isBackFace = DoubleSided > 0.5 && (id >= pointCount * 6);
+    if (isBackFace)
+    {
+        uint localId = id - pointCount * 6;
+        quadIndex   = localId % 6;
+        particleId  = localId / 6;
+    }
+
     float3 cornerFactors = Corners[quadIndex];
-    float f = (float)(particleId + cornerFactors.x)  / clamp(pointCount - 1, 1,100000);
+    float f = (float)(particleId + cornerFactors.x) / clamp(pointCount - 1, 1, 100000);
 
-    int offset = cornerFactors.x < 0.5 ? 0 : 1; 
-    LegacyPoint p = Points[particleId+offset];
+    int offset = cornerFactors.x < 0.5 ? 0 : 1;
+    Point p = Points[particleId + offset];
 
-    float spinRad = (Spin + Twist *f) * 3.141578/180;
-    //float3 side = float3(0, cos(spinRad), sin(spinRad)) * cornerFactors.y;
-    float3 side = float3(cos(spinRad), 0, sin(spinRad)) * cornerFactors.y;
+    // --- Separator / line-break support ---
+    Point p0 = Points[particleId];
+    Point p1 = Points[min(particleId + 1, pointCount - 1)];
+    bool isSeparator = isnan(p0.Scale.x) || isnan(p1.Scale.x);
 
-    float WidthFactor = UseWAsWeight || isnan(p.W)> 0.5 ? p.W  : 1;
-    float3 widthV = qRotateVec3(side, p.Rotation) * Width * WidthFactor;
+    if (isSeparator)
+    {
+        output.pixelPosition = float4(0, 0, 0, 0);
+        output.texCoord      = float2(0, 0);
+        output.worldPosition = float3(0, 0, 0);
+        output.tbnToWorld    = float3x3(1,0,0, 0,1,0, 0,0,1);
+        output.fog           = 0;
+        output.color         = float4(0, 0, 0, 0);
+        return output;
+    }
+    // --- end separator check ---
+
+    float spinRad = (Spin + Twist * f) * 3.141578 / 180;
+
+    // Smooth tangent: average with the neighbouring segment at this vertex
+    float3 tangent;
+    if (offset == 0)
+    {
+        int prevIdx = max(particleId - 1, 0);
+        Point pPrev = Points[prevIdx];
+        float3 segCurr = p1.Position - p0.Position;
+        float3 segPrev = p0.Position - pPrev.Position;
+        tangent = normalize(isnan(pPrev.Scale.x) ? segCurr : (segCurr + segPrev));
+    }
+    else
+    {
+        int nextIdx = min(particleId + 2, pointCount - 1);
+        Point pNext = Points[nextIdx];
+        float3 segCurr = p1.Position - p0.Position;
+        float3 segNext = pNext.Position - p1.Position;
+        tangent = normalize(isnan(pNext.Scale.x) ? segCurr : (segCurr + segNext));
+    }
+
+    // Side: unit vector rotated by spin/twist and point quaternion
+    float3 sideLocal = float3(cos(spinRad), 0, sin(spinRad));
+    float3 rotatedSide = qRotateVec3(sideLocal, p.Rotation);
+
+    // Flip winding for back faces
+    float sideFactor = isBackFace ? -cornerFactors.y : cornerFactors.y;
+
+    float WidthFactor = UseWAsWeight > 0.5 ? p.FX2 : 1;
+    float3 widthV = rotatedSide * sideFactor * Width * WidthFactor;
     float3 pInObject = p.Position + widthV;
 
-    float3 normalTwisted =  float3(0, cos(spinRad + 3.141578/2), sin(spinRad + 3.141578/2));
-    float3 normal = normalize(qRotateVec3(normalTwisted, p.Rotation));
-    float4 normalInScreen = mul(float4(normal,0), ObjectToClipSpace);
+    // Normal: cross product, flipped for back faces
+    float3 normal = normalize(cross(tangent, rotatedSide));
+    if (isBackFace)
+        normal = -normal;
 
-    output.texCoord = float2(cornerFactors.x , cornerFactors.y /2 +0.5);
-    if(TextureMode < 0.5) {
-        output.texCoord = float2( f * (TextureRange.y - TextureRange.x) + TextureRange.x ,  cornerFactors.y /2 +0.5);
+    output.texCoord = float2(cornerFactors.x, cornerFactors.y / 2 + 0.5);
+    if (TextureMode < 0.5) {
+        output.texCoord = float2(f * (TextureRange.y - TextureRange.x) + TextureRange.x, cornerFactors.y / 2 + 0.5);
     }
     else if (TextureMode < 1.5) {
-        output.texCoord = float2( f * TextureRange.y + TextureRange.x ,  cornerFactors.y /2 +0.5);        
+        output.texCoord = float2(f * TextureRange.y + TextureRange.x, cornerFactors.y / 2 + 0.5);
     }
     else if (TextureMode < 2.5) {
         output.texCoord += TextureRange;
     }
-    else  {
-        output.texCoord.x = p.W;
+    else {
+        output.texCoord.x = p.FX1;
     }
 
-    // Pass tangent space basis vectors (for normal mapping).
+    // TBN: all three vectors in the same rotated space
     float3x3 TBN = float3x3(
-        normalize(qRotateVec3(float3(1,0,0), p.Rotation)), //  vertex.Bitangent, 
-        side, 
-        normal
-        );
-        
+        tangent,      // T: along ribbon
+        rotatedSide,  // B: across ribbon
+        normal        // N: facing out from ribbon surface
+    );
+
     TBN = mul(TBN, (float3x3)ObjectToWorld);
     output.tbnToWorld = TBN;
 
-    output.worldPosition =  mul(float4(pInObject,0), ObjectToWorld); 
+    output.worldPosition = mul(float4(pInObject, 0), ObjectToWorld);
 
-    float4 pInScreen  = mul(float4(pInObject,1), ObjectToClipSpace);
-
-    // float3 lightDirection = float3(1.2, 1, -0.1);
-    // float phong = pow(  abs(dot(normal,lightDirection )),1);
-    
+    float4 pInScreen = mul(float4(pInObject, 1), ObjectToClipSpace);
     output.pixelPosition = pInScreen;
 
     // Fog
-    float4 posInCamera = mul(float4(pInObject,1), ObjectToCamera);
-    output.fog = pow(saturate(-posInCamera.z/FogDistance), FogBias);
+    float4 posInCamera = mul(float4(pInObject, 1), ObjectToCamera);
+    output.fog = pow(saturate(-posInCamera.z / FogDistance), FogBias);
     output.color = Color * p.Color;
-    return output;    
+    return output;
 }
 
 
@@ -171,6 +219,8 @@ float4 psMain(psInput pin) : SV_TARGET
     
     float3 N = normalize(2.0 * normalMap.rgb - 1.0);
     N = normalize(mul(N, pin.tbnToWorld));
+
+    
 
     // Angle between surface normal and outgoing light direction.
     float cosLo = abs( dot(N, Lo));

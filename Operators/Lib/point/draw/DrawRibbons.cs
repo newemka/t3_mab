@@ -40,6 +40,9 @@ internal sealed class DrawRibbons : Instance<DrawRibbons>
 
     [Input(Guid = "31791971-8c6e-4f8f-8b04-a3abf02ad69b")]
     public readonly InputSlot<bool> UseWAsWeight = new();
+
+        [Input(Guid = "39f1b9f8-af86-46fd-a5b3-91421b2d81f0")]
+        public readonly InputSlot<bool> DoubleSided = new InputSlot<bool>();
         
     private enum TextureModes
     {

@@ -15,8 +15,8 @@
     {
       "InputId": "1e3af280-2f64-423d-b14d-630065659afc"/*TextureMode*/,
       "Position": {
-        "X": -224.65475,
-        "Y": 408.20538
+        "X": -297.26733,
+        "Y": 406.4125
       },
       "GroupTitle": "Texture Options",
       "Description": "Defines the mode in which the texture is mapped to the tape. "
@@ -42,10 +42,18 @@
     {
       "InputId": "3198a61e-94b3-42c4-a2ae-822456db8bdd"/*TextureRange*/,
       "Position": {
-        "X": -224.65475,
-        "Y": 453.20538
+        "X": -297.26733,
+        "Y": 451.4125
       },
       "Description": "Modifies the Start- and Endpoint of the used texture scaling / stretching it."
+    },
+    {
+      "InputId": "39f1b9f8-af86-46fd-a5b3-91421b2d81f0"/*DoubleSided*/,
+      "Position": {
+        "X": -255.39523,
+        "Y": 854.39685
+      },
+      "Description": "Works with Back culling "
     },
     {
       "InputId": "3f8b336d-fb2b-4b8a-b13a-a229e7792f46"/*Spin*/,
@@ -132,8 +140,8 @@
     {
       "ChildId": "05dc9c5e-e53e-4d43-908a-7f7bc7208b05"/*RasterizerState*/,
       "Position": {
-        "X": 760.10345,
-        "Y": 580.56696
+        "X": 749.4923,
+        "Y": 908.4506
       }
     },
     {
@@ -160,8 +168,8 @@
     {
       "ChildId": "14cfffa8-24c9-494e-81ec-000924300dcb"/*PickBlendMode*/,
       "Position": {
-        "X": 760.10345,
-        "Y": 705.5668
+        "X": 692.19226,
+        "Y": 647.2056
       }
     },
     {
@@ -174,8 +182,8 @@
     {
       "ChildId": "212cb0b3-42c8-49ce-a67b-cc4aacd03538"/*ClampInt*/,
       "Position": {
-        "X": 635.73584,
-        "Y": 813.56067
+        "X": 611.5229,
+        "Y": 816.21344
       }
     },
     {
@@ -200,15 +208,15 @@
     {
       "ChildId": "2b22b227-7375-4eba-8ac5-6ea1de0b5808"/*GetSRVProperties*/,
       "Position": {
-        "X": 375.7359,
-        "Y": 813.56067
+        "X": 331.5229,
+        "Y": 816.21344
       }
     },
     {
       "ChildId": "3abd1369-4fa6-46fe-aeab-7fb2f141d624"/*Draw*/,
       "Position": {
-        "X": 895.73596,
-        "Y": 813.56067
+        "X": 891.5229,
+        "Y": 816.21344
       }
     },
     {
@@ -221,15 +229,15 @@
     {
       "ChildId": "7bba8aa3-d0c7-4dbe-b3d8-4eb667e6176f"/*Rasterizer*/,
       "Position": {
-        "X": 890.10345,
-        "Y": 580.56696
+        "X": 952.7091,
+        "Y": 910.5729
       }
     },
     {
       "ChildId": "8bcd8157-25e0-405c-9e88-384109341798"/*DepthStencilState*/,
       "Position": {
-        "X": 760.10345,
-        "Y": 649.5669
+        "X": 692.19226,
+        "Y": 703.6837
       }
     },
     {
@@ -263,8 +271,15 @@
     {
       "ChildId": "bb33c901-8dc4-49a6-97f6-1ff8a477ffa7"/*MultiplyInt*/,
       "Position": {
-        "X": 765.7359,
-        "Y": 813.56067
+        "X": 751.5229,
+        "Y": 816.21344
+      }
+    },
+    {
+      "ChildId": "cb40c8d8-13cb-42a4-ab8b-a426619ac5ad"/*BoolToFloat*/,
+      "Position": {
+        "X": -55.02603,
+        "Y": 1012.16974
       }
     },
     {
@@ -296,8 +311,8 @@
     {
       "ChildId": "e0a7f6bf-6448-41e6-b83e-220d0a64145f"/*AddInts*/,
       "Position": {
-        "X": 505.7359,
-        "Y": 813.56067
+        "X": 471.5229,
+        "Y": 816.21344
       }
     },
     {
@@ -319,6 +334,13 @@
       "Position": {
         "X": 1008.0199,
         "Y": -119.76574
+      }
+    },
+    {
+      "ChildId": "f08bbda8-15e2-4643-87e7-3a6138c8d53f"/*BoolToInt*/,
+      "Position": {
+        "X": 74.854126,
+        "Y": 884.8362
       }
     },
     {
