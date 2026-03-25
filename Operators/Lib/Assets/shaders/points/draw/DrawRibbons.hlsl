@@ -112,8 +112,11 @@ psInput vsMain(uint id: SV_VertexID)
 
     // --- Separator / line-break support ---
     Point p0 = Points[particleId];
+    // If there's no separator at the end of the buffer, the last particleId
+    // has no valid p1 — treat it as a separator to avoid a degenerate quad.
+    bool isLastQuad = (particleId + 1 >= (int)pointCount);
     Point p1 = Points[min(particleId + 1, pointCount - 1)];
-    bool isSeparator = isnan(p0.Scale.x) || isnan(p1.Scale.x);
+    bool isSeparator = isLastQuad || isnan(p0.Scale.x) || isnan(p1.Scale.x);
 
     if (isSeparator)
     {
