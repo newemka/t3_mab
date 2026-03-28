@@ -71,7 +71,7 @@
       "ChildId": "519fa01d-8b43-4bdb-8cdd-499c35f156c0"/*ExecuteBufferUpdate*/,
       "Position": {
         "X": 577.38947,
-        "Y": 727.6048
+        "Y": 762.6048
       }
     },
     {
@@ -105,8 +105,15 @@
     {
       "ChildId": "8666fc66-a454-472f-9008-57f2034675dc"/*GetBufferComponents*/,
       "Position": {
-        "X": -439.24286,
-        "Y": 618.8263
+        "X": -311.03513,
+        "Y": 658.7277
+      }
+    },
+    {
+      "ChildId": "8803ae69-fd87-4e6a-992a-49a1958de1f8"/*KeepPreviousPointBuffer*/,
+      "Position": {
+        "X": -227.96033,
+        "Y": 555.88806
       }
     },
     {
@@ -135,6 +142,13 @@
       "Position": {
         "X": 249.65977,
         "Y": 528.57837
+      }
+    },
+    {
+      "ChildId": "dc511e2d-91ef-4104-9144-4c45e4a212b6"/*GetBufferComponents*/,
+      "Position": {
+        "X": -35.884155,
+        "Y": 617.21844
       }
     },
     {
@@ -176,7 +190,7 @@
       "OutputId": "23a08560-9764-42a1-a889-dd8839476747"/*Output*/,
       "Position": {
         "X": 577.3895,
-        "Y": 797.6048
+        "Y": 832.6048
       }
     }
   ]
