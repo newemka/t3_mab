@@ -42,5 +42,6 @@ internal sealed class OrientPoints : Instance<OrientPoints>
             LootAtTarget,
             Screen,
             LookAtCamera,
+            MoveDirection,
     }
 }

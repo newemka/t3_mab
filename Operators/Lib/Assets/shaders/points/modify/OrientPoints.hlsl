@@ -79,28 +79,44 @@ RWStructuredBuffer<Point> ResultPoints : u0;
 
         case 3: // Moving direction
         {
-
             Point pp = PreviousSourcePoints[i.x];
             float3 moveDir = p.Position - pp.Position;
-            
-           
+  
             float3 upVector = UpVector;
-            moveDir = normalize(moveDir) * sign;
-            if (abs(dot(normalize(UpVector),normalize(moveDir))) > .8){
+            upVector=qRotateVec3(float3(0, 1, 0), ResultPoints[i.x].Rotation);
+
+            moveDir = moveDir * sign;
+
+            if(length(moveDir)==0.0){
+                if(length(ResultPoints[i.x].Rotation)<0.1)//prev rotation invalid
+                {
+                    p.Rotation=SourcePoints[i.x].Rotation;
+                    
+                }else{
+                    p.Rotation=ResultPoints[i.x].Rotation;
+                }
+                break;
+            }
+
+            /*if (abs(dot(normalize(UpVector),normalize(moveDir))) > .999){
                 upVector = float3(1,0,0);
-            }  
-            float4 newRot = qLookAt(moveDir, normalize(upVector));
+            }  */
+
+            float4 newRot = qLookAt(normalize(moveDir), normalize(upVector));
             
             // Adjust orientation so Z+ points forward
             float3 forward = qRotateVec3(float3(0, 0, 1), newRot);
-            float4 alignment = qFromAngleAxis(PI, forward); // Use PI constant
+            float4 alignment = qFromAngleAxis(PI, forward); 
+
             newRot = qMul(alignment, newRot);
-            strength *= smoothstep(0.0,0.001,length(moveDir));
+            strength *= smoothstep(0.0,0.01,length(moveDir)-.001);
             p.Rotation = normalize(qSlerp(normalize(ResultPoints[i.x].Rotation), normalize(newRot),  saturate(strength)));
-           if (length(moveDir)<.01){
-            p.Rotation = ResultPoints[i.x].Rotation;
-           }
-           // p.Rotation = ResultPoints[i.x].Rotation;
+            if (length(moveDir)<.001){
+                p.Rotation = ResultPoints[i.x].Rotation;
+            }
+            upVector=qRotateVec3(float3(0, 1, 0), p.Rotation);
+            p.Rotation = normalize(qSlerp(qMul(qFromVectors(upVector,UpVector),p.Rotation),p.Rotation, saturate((AmountFactor == 1) ? p.FX1
+                                                     : p.FX2)));
         }
         break;
         
