@@ -429,7 +429,7 @@ internal sealed class GraphView : ScalableCanvas, IGraphView
         if (compositionInstance != _projectView.RootInstance && !compositionInstance.Symbol.SymbolPackage.IsReadOnly)
         {
             var symbol = compositionInstance.Symbol;
-            _addInputDialog.Draw(symbol);
+            _addInputDialog.Draw(symbol, Vector2.Zero);
             _addOutputDialog.Draw(symbol);
         }
 

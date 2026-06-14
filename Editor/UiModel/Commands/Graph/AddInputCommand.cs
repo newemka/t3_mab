@@ -12,13 +12,14 @@ internal sealed class AddInputCommand : ICommand
     public string Name => "Add Input";
     public bool IsUndoable => true;
 
-    public AddInputCommand(Guid symbolId, string inputName, Type inputType, bool multiInput)
+    public AddInputCommand(Guid symbolId, string inputName, Type inputType, bool multiInput, Vector2 posOnCanvas)
     {
         _symbolId = symbolId;
         _inputId = Guid.NewGuid();
         _inputName = inputName;
         _inputType = inputType;
         _multiInput = multiInput;
+        _posOnCanvas = posOnCanvas;
     }
 
     public void Do()
@@ -30,6 +31,12 @@ internal sealed class AddInputCommand : ICommand
         }
 
         InputsAndOutputs.AddInputToSymbol(_inputId, _inputName, _multiInput, _inputType, symbolUi.Symbol);
+
+        // Place the new input UI at the captured canvas position
+        if (symbolUi.InputUis.TryGetValue(_inputId, out var inputUi))
+        {
+            inputUi.PosOnCanvas = _posOnCanvas;
+        }
     }
 
     public void Undo()
@@ -48,4 +55,5 @@ internal sealed class AddInputCommand : ICommand
     private readonly string _inputName;
     private readonly Type _inputType;
     private readonly bool _multiInput;
+    private readonly Vector2 _posOnCanvas;
 }

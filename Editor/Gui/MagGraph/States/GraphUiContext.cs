@@ -168,6 +168,7 @@ internal sealed class GraphUiContext
     }
     
     internal Vector2 PeekAnchorInCanvas;
+    internal Vector2 ContextMenuPosOnCanvas;
     internal bool ShouldAttemptToSnapToInput;
     
     internal MacroCommand StartMacroCommand(string title)
@@ -226,7 +227,7 @@ internal sealed class GraphUiContext
             if (projectView.CompositionInstance != projectView.RootInstance 
                 && !compositionSymbol.SymbolPackage.IsReadOnly)
             {
-                results |= AddInputDialog.Draw(compositionSymbol);
+                results |= AddInputDialog.Draw(compositionSymbol, ContextMenuPosOnCanvas);
                 results |= AddOutputDialog.Draw(compositionSymbol);
                 RenameOutputDialog.Draw();
             }

@@ -275,7 +275,12 @@ internal sealed partial class MagGraphView
             }
 
             if (FrameStats.Current.OpenedPopUpName == string.Empty)
+            {
+                if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+                    _context.ContextMenuPosOnCanvas = InverseTransformPositionFloat(ImGui.GetMousePos());
+
                 CustomComponents.DrawContextMenuForScrollCanvas(() => GraphContextMenu.DrawContextMenuContent(_context, _projectView), ref _contextMenuIsOpen);
+            }
 
             SmoothItemPositions();
 

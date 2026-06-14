@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 using ImGuiNET;
 using T3.Core.Operator;
@@ -19,7 +19,7 @@ internal sealed class AddInputDialog : ModalDialog
         Flags = ImGuiWindowFlags.NoResize;
     }
 
-    internal ChangeSymbol.SymbolModificationResults  Draw(Symbol symbol)
+    internal ChangeSymbol.SymbolModificationResults Draw(Symbol symbol, Vector2 posOnCanvas)
     {
         var results = ChangeSymbol.SymbolModificationResults.Nothing;
         
@@ -36,10 +36,10 @@ internal sealed class AddInputDialog : ModalDialog
                 
             FormInputs.AddVerticalSpace(5);
             FormInputs.ApplyIndent();
-            
+
             if (CustomComponents.DisablableButton("Add", isValid))
             {
-                UndoRedoStack.AddAndExecute(new AddInputCommand(symbol.Id, _parameterName, _selectedType!, _multiInput));
+                UndoRedoStack.AddAndExecute(new AddInputCommand(symbol.Id, _parameterName, _selectedType!, _multiInput, posOnCanvas));
                 _parameterName = string.Empty;
             }
 
