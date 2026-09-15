@@ -430,11 +430,6 @@ internal sealed class TextToCurvesWTG : Instance<TextToCurvesWTG>, IDescriptiveF
         private static Vector3 Flip(double x, double y, double penX, double penY) =>
             new((float)(x + penX), (float)(-y + penY), 0);
 
-        // ---- Subdivision (identical to TextToCurves) ----
-
-        /// <summary>Moves the text cursor to the next occurrence of the glyph's code point, counting words and lines passed.</summary>
-
-
         /// <summary>Rough length of a cubic from its control polygon and chord.</summary>
         private static float ApproximateCubicLength(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
         {
