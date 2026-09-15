@@ -1,29 +1,31 @@
 #nullable enable
-using SixLabors.Fonts;
-using SixLabors.Fonts.Unicode;
-#if SIXLABORS_FONTS_V3
-using SixLabors.Fonts.Rendering;
-#endif
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using T3.Core.Utils;
+using WaterTrans.GlyphLoader;
+using WaterTrans.GlyphLoader.Geometry;
 
 namespace Lib.geometry;
 
 /// <summary>
-/// Lays out a string with a TrueType/OpenType font and emits the glyph outlines as
-/// CurveGeometry: one part per glyph (pivot at its origin), closed contours of cubic
-/// beziers, with per-glyph attributes for downstream selection and styling.
+/// Lays out a string with WaterTrans.GlyphLoader and emits glyph outlines as
+/// CurveGeometry: one part per glyph, closed contours of cubic beziers, with
+/// per-glyph attributes. Variable-font axes and kerning are not supported by
+/// GlyphLoader 1.2.2 and are reported via the status provider.
 /// </summary>
-[Guid("e2b7f4a1-3c69-4d58-8a1e-9f6c0d2b5e37")]
-[ExportDependencies("SixLabors.Fonts.dll")]
-internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilename, IStatusProvider
+[Guid("f7a2c9e1-4b63-4d08-9e5a-2c7f8b1d6a34")]
+[ExportDependencies("WaterTrans.GlyphLoader.dll")]
+internal sealed class TextToCurvesWTG : Instance<TextToCurvesWTG>, IDescriptiveFilename, IStatusProvider
 {
-    [Output(Guid = "5d3f9b27-a8c1-4e60-b2d4-7e9f1c6a3b85")]
+    [Output(Guid = "3e8b5f2a-9c14-4d67-a0e3-7b1f6c9a2e85")]
     public readonly Slot<CurveGeometry?> Curves = new();
 
-    [Output(Guid = "9a6e2c48-d1b5-4f73-8c0e-3b7d5a2f9e16")]
+    [Output(Guid = "a4d2f7c9-1b83-4e56-8f0a-5c9e2b7d1a63")]
     public readonly Slot<int> GlyphCount = new();
 
-    public TextToCurves()
+    public TextToCurvesWTG()
     {
         _resource = new Resource<LoadedFont>(Path, TryLoadFont, allowDisposal: false);
         _resource.AddDependentSlots(Curves, GlyphCount);
@@ -61,51 +63,18 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
             return;
         }
 
-        // Dpi 72 makes one point one unit, so Size is the em height in scene units.
-#if SIXLABORS_FONTS_V3
-        // Variation axes only apply when the font has them; static fonts ignore the values.
-        _variations.Clear();
-        if (loadedFont.HasAxis(KnownVariationAxes.Weight) && weight > 0)
-            _variations.Add(new FontVariation(KnownVariationAxes.Weight, weight));
+        if (weight > 0 || axisTag.Length == 4)
+            _warningMessage = "Variable-font axes are not supported by WaterTrans.GlyphLoader.";
 
-        if (axisTag.Length == 4 && loadedFont.HasAxis(axisTag))
-            _variations.Add(new FontVariation(axisTag, axisValue));
+        if (kerning)
+            _warningMessage = "Kerning is not supported by WaterTrans.GlyphLoader.";
 
-        var font = _variations.Count > 0
-                       ? loadedFont.Family.CreateFont(size, _variations.ToArray())
-                       : loadedFont.Family.CreateFont(size);
-#else
-        // SixLabors.Fonts 2.x has no variable-font support: Weight and Axis are accepted but have no effect
-        _ = weight; _ = axisTag; _ = axisValue;
-        var font = loadedFont.Family.CreateFont(size);
-#endif
-        var options = new TextOptions(font)
-        {
-            Dpi = 72,
-            LineSpacing = lineSpacing,
-            KerningMode = kerning ? KerningMode.Standard : KerningMode.None,
-            HorizontalAlignment = alignment switch
-            {
-                Alignments.Center => HorizontalAlignment.Center,
-                Alignments.Right  => HorizontalAlignment.Right,
-                _                 => HorizontalAlignment.Left,
-            },
-            TextAlignment = alignment switch
-            {
-                Alignments.Center => TextAlignment.Center,
-                Alignments.Right  => TextAlignment.End,
-                _                 => TextAlignment.Start,
-            },
-        };
+        var tf = loadedFont.Typeface;
 
         _collector.Begin(text, pivot, maxEdgeLength, evenSpacing);
         try
         {
-#if SIXLABORS_FONTS_V3
-            TextRenderer.RenderTo(_collector, text, options);
-#else
-            TextRenderer.RenderTextTo(_collector, text, options);
-#endif
+            LayoutText(tf, text, size, lineSpacing, alignment);
         }
         catch (Exception e)
         {
@@ -121,25 +90,111 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
         GlyphCount.Value = _output.Parts.Length;
     }
 
+    /// <summary>
+    /// Manual horizontal layout: split by newline, measure each line, align it,
+    /// then walk code points and emit one glyph per code point. Kerning is skipped
+    /// because GlyphLoader 1.2.2 does not expose it.
+    /// </summary>
+    private void LayoutText(Typeface tf, string text, float size, float lineSpacing, Alignments alignment)
+    {
+        var lineHeight = (float)(tf.Height * size) * lineSpacing;
+        var baseline = (float)(tf.Baseline * size);
+
+        var lines = text.Split('\n');
+        var charIndex = 0;
+        var wordIndex = 0;
+
+        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+        {
+            var line = lines[lineIndex];
+            var lineWidth = MeasureLine(tf, line, size);
+
+            var startX = alignment switch
+            {
+                Alignments.Center => -lineWidth * 0.5f,
+                Alignments.Right => -lineWidth,
+                _ => 0f,
+            };
+
+            var penX = startX;
+            var baselineY = -lineIndex * lineHeight - baseline;
+
+            var i = 0;
+            while (i < line.Length)
+            {
+                var consumed = DecodeRune(line, i, out var codePoint);
+                var glyphIndex = LookupGlyph(tf, codePoint);
+                if (glyphIndex == 0)
+                {
+                    penX += (float)(tf.AdvanceWidths[0] * size);
+                    i += consumed;
+                    charIndex += consumed;
+                    continue;
+                }
+
+                var advance = (float)(tf.AdvanceWidths[glyphIndex] * size);
+                var geometry = tf.GetGlyphOutline(glyphIndex, size);
+
+                _collector.AddGlyph(
+                    geometry,
+                    penX, baselineY,
+                    codePoint, glyphIndex,
+                    charIndex, wordIndex, lineIndex,
+                    advance);
+
+                // Count words at whitespace boundaries
+                if (char.IsWhiteSpace(line[i]) && (i == 0 || !char.IsWhiteSpace(line[i - 1])))
+                    wordIndex++;
+
+                penX += advance;
+                i += consumed;
+                charIndex += consumed;
+            }
+
+            // Newline counts as a word boundary
+            wordIndex++;
+        }
+    }
+
+    private static float MeasureLine(Typeface tf, string line, float size)
+    {
+        var width = 0f;
+        var i = 0;
+        while (i < line.Length)
+        {
+            var consumed = DecodeRune(line, i, out var codePoint);
+            var glyphIndex = LookupGlyph(tf, codePoint);
+            width += (float)(tf.AdvanceWidths[glyphIndex] * size);
+            i += consumed;
+        }
+        return width;
+    }
+
+    private static int DecodeRune(string s, int index, out int codePoint)
+    {
+        if (char.IsHighSurrogate(s[index]) && index + 1 < s.Length && char.IsLowSurrogate(s[index + 1]))
+        {
+            codePoint = char.ConvertToUtf32(s[index], s[index + 1]);
+            return 2;
+        }
+
+        codePoint = s[index];
+        return 1;
+    }
+
+    private static ushort LookupGlyph(Typeface tf, int codePoint)
+    {
+        return tf.CharacterToGlyphMap.TryGetValue(codePoint, out var glyph) ? glyph : (ushort)0;
+    }
+
     private bool TryLoadFont(FileResource file, LoadedFont? currentValue, [NotNullWhen(true)] out LoadedFont? newValue,
                              [NotNullWhen(false)] out string? failureReason)
     {
         try
         {
-            var collection = new FontCollection();
-            var family = collection.Add(file.AbsolutePath);
-            var axes = new HashSet<string>();
-#if SIXLABORS_FONTS_V3
-            if (family.TryGetMetrics(FontStyle.Regular, out var metrics) && metrics.TryGetVariationAxes(out var variationAxes))
-            {
-                foreach (var axis in variationAxes.Span)
-                {
-                    axes.Add(axis.Tag.ToString());
-                }
-            }
-#endif
-
-            newValue = new LoadedFont(collection, family, axes);
+            var stream = File.OpenRead(file.AbsolutePath);
+            var typeface = new Typeface(stream);
+            newValue = new LoadedFont(typeface, stream);
             failureReason = null;
             return true;
         }
@@ -152,13 +207,22 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
         }
     }
 
-    /// <summary>The collection keeps the parsed tables alive; the family is what fonts are created from.</summary>
-    private sealed record LoadedFont(FontCollection Collection, FontFamily Family, HashSet<string> Axes)
+    /// <summary>The stream must stay open because GlyphLoader lazily reads glyph data.</summary>
+    private sealed class LoadedFont : IDisposable
     {
-        public bool HasAxis(string tag) => Axes.Contains(tag);
-#if SIXLABORS_FONTS_V3
-        public bool HasAxis(SixLabors.Fonts.Tables.AdvancedTypographic.Tag tag) => Axes.Contains(tag.ToString());
-#endif
+        public LoadedFont(Typeface typeface, Stream stream)
+        {
+            Typeface = typeface;
+            _stream = stream;
+        }
+
+        public Typeface Typeface { get; }
+        private readonly Stream _stream;
+
+        public void Dispose()
+        {
+            _stream.Dispose();
+        }
     }
 
     private enum Alignments
@@ -169,21 +233,17 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
     }
 
     /// <summary>
-    /// Receives the glyph outlines from the layout engine and turns them into contours
-    /// of cubic beziers. Layout coordinates are y-down pixels; they are flipped so text
-    /// reads upright in scene space. Quadratic segments (TrueType) are raised to cubics
-    /// exactly. Per glyph the source character is found by walking the text in parallel,
-    /// which yields character, word and line indices even across ligatures.
+    /// Converts GlyphLoader PathGeometry into the CurveGeometry representation.
+    /// The outline is in font design units scaled by the requested size; Y is
+    /// flipped so text reads upright in scene space.
     /// </summary>
-    private sealed class OutlineCollector : IGlyphRenderer
+    private sealed class OutlineCollector
     {
         public void Begin(string text, Vector2 pivot, float maxEdgeLength, bool evenSpacing)
         {
-            _text = text;
             _pivot = pivot;
-            _textCursor = 0;
-            _wordIndex = 0;
-            _lineIndex = 0;
+            _maxEdgeLength = maxEdgeLength;
+            _evenSpacing = evenSpacing;
             _positions.Clear();
             _handlesIn.Clear();
             _handlesOut.Clear();
@@ -197,9 +257,6 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
             _wordIndices.Clear();
             _lineIndices.Clear();
             _advances.Clear();
-            _pivots.Clear();
-            _maxEdgeLength = maxEdgeLength;
-            _evenSpacing = evenSpacing;
         }
 
         public void Finish(CurveGeometry target)
@@ -214,6 +271,7 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
                                               p.Pivot, p.Id, p.SeedIndex);
                 }
             }
+
             target.Positions = _positions.ToArray();
             target.HandlesIn = _handlesIn.ToArray();
             target.HandlesOut = _handlesOut.ToArray();
@@ -235,196 +293,147 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
         private static void Fill<T>(T[] target, List<T> source)
         {
             for (var i = 0; i < source.Count; i++)
-            {
                 target[i] = source[i];
+        }
+
+        public void AddGlyph(PathGeometry geometry, float penX, float penY,
+                             int codePoint, int glyphId,
+                             int charIndex, int wordIndex, int lineIndex,
+                             float advance)
+        {
+            var contourStart = _contourOffsets.Count - 1;
+            var startPositionCount = _positions.Count;
+
+            // Walk each figure of the glyph
+            foreach (var figure in geometry.Figures)
+            {
+                var figureStart = _positions.Count;
+
+                // Start point (flipped and translated)
+                AddAnchor(figure.StartPoint.X + penX, -(figure.StartPoint.Y) + penY);
+
+                foreach (var segment in figure.Segments)
+                {
+                    switch (segment)
+                    {
+                        case LineSegment line:
+                            AddAnchor(line.Point.X + penX, -(line.Point.Y) + penY);
+                            break;
+
+                        case BezierSegment bezier:
+                            {
+                                var last = _positions.Count - 1;
+                                _handlesOut[last] = Flip(bezier.Point1.X, bezier.Point1.Y, penX, penY);
+                                AddAnchor(bezier.Point3.X + penX, -(bezier.Point3.Y) + penY);
+                                _handlesIn[_positions.Count - 1] = Flip(bezier.Point2.X, bezier.Point2.Y, penX, penY);
+                                break;
+                            }
+                        case QuadraticBezierSegment quad:
+                            {
+                                var last = _positions.Count - 1;
+                                var p0 = _positions[last];
+                                var c = Flip(quad.Point1.X, quad.Point1.Y, penX, penY);
+                                var p1 = Flip(quad.Point2.X, quad.Point2.Y, penX, penY);
+
+                                _handlesOut[last] = p0 + (c - p0) * (2f / 3f);
+                                AddAnchor(quad.Point2.X + penX, -(quad.Point2.Y) + penY);
+                                _handlesIn[_positions.Count - 1] = p1 + (c - p1) * (2f / 3f);
+                                break;
+                            }
+                        default:
+                            Log.Warning($"Unsupported glyph outline segment type: {segment.GetType().Name}");
+                            break;
+                    }
+                }
+
+                var count = _positions.Count - figureStart;
+                if (count < 2)
+                {
+                    _positions.RemoveRange(figureStart, count);
+                    _handlesIn.RemoveRange(figureStart, count);
+                    _handlesOut.RemoveRange(figureStart, count);
+                    continue;
+                }
+
+                // Fold an explicit close back to the start into the closed flag
+                var first = _positions[figureStart];
+                var lastIndex = _positions.Count - 1;
+                if (Vector3.DistanceSquared(_positions[lastIndex], first) < 1e-10f)
+                {
+                    _handlesIn[figureStart] = _handlesIn[lastIndex];
+                    _positions.RemoveAt(lastIndex);
+                    _handlesIn.RemoveAt(lastIndex);
+                    _handlesOut.RemoveAt(lastIndex);
+                }
+
+                _contourOffsets.Add(_positions.Count);
+                _contourClosed.Add(true);
             }
-        }
 
-        public bool BeginGlyph(in FontRectangle bounds, in GlyphRendererParameters parameters)
-        {
-            _glyphContourStart = _contourOffsets.Count - 1;
-            _glyphBounds = bounds;
-            _glyphCodePoint = parameters.CodePoint.Value;
-            _glyphId = parameters.GlyphId;
-            AdvanceTextCursorTo(parameters.CodePoint);
-            return true;
-        }
-
-#if SIXLABORS_FONTS_V3
-        public void BeginLayer(Paint paint, FillRule fillRule)
-        {
-        }
-
-        public void EndLayer()
-        {
-        }
-
-        public void BeginGroup(CompositeMode mode)
-        {
-        }
-
-        public void EndGroup()
-        {
-        }
-
-        public void ArcTo(float radiusX, float radiusY, float rotation, bool largeArc, bool sweep, Vector2 point)
-        {
-            // Font outlines are lines and beziers; arcs only occur in SVG color glyphs, which we don't render
-            LineTo(point);
-        }
-
-        public void SetDecoration(TextDecorations textDecorations, Vector2 start, Vector2 end, float thickness, ReadOnlyMemory<float> dashPattern)
-        {
-        }
-#else
-        public void SetDecoration(TextDecorations textDecorations, Vector2 start, Vector2 end, float thickness)
-        {
-        }
-#endif
-
-        public void EndGlyph()
-        {
-            var contourCount = _contourOffsets.Count - 1 - _glyphContourStart;
+            var contourCount = _contourOffsets.Count - 1 - contourStart;
             if (contourCount == 0)
-                return; // whitespace and control glyphs: layout advances, nothing to draw
-
-            // Calculate pivot based on input PivotPosition value
-            // Bounds are in em units. X is left, Y is bottom of the box.
-            var x = _glyphBounds.Left;
-            var yBottom = -_glyphBounds.Bottom; // Flipped for scene space
-
-            var pivotX = x + _glyphBounds.Width * (_pivot.X + 1f) * 0.5f;
-            var pivotY = yBottom + _glyphBounds.Height * (_pivot.Y + 1f) * 0.5f;
-
-            var finalPivot = new Vector3(pivotX, pivotY, 0);
-
-            _parts.Add(new CurvePart(_glyphContourStart, contourCount, finalPivot, _parts.Count, _charIndex));
-            _codePoints.Add(_glyphCodePoint);
-            _glyphIds.Add(_glyphId);
-            _charIndices.Add(_charIndex);
-            _wordIndices.Add(_wordIndex);
-            _lineIndices.Add(_lineIndex);
-            _advances.Add(_glyphBounds.Width);
-        }
-
-        public void BeginFigure()
-        {
-            _figureStart = _positions.Count;
-        }
-
-        public void MoveTo(Vector2 point)
-        {
-            AddAnchor(point);
-        }
-
-        public void LineTo(Vector2 point)
-        {
-            AddAnchor(point);
-        }
-
-        public void QuadraticBezierTo(Vector2 control, Vector2 point)
-        {
-            // Exact elevation: cubic handles at two thirds of the way to the quadratic control
-            var last = _positions.Count - 1;
-            var p0 = new Vector2(_positions[last].X, -_positions[last].Y);
-            var c1 = p0 + (control - p0) * (2f / 3f);
-            var c2 = point + (control - point) * (2f / 3f);
-            _handlesOut[last] = Flip(c1);
-            AddAnchor(point, handleIn: Flip(c2));
-        }
-
-        public void CubicBezierTo(Vector2 secondControlPoint, Vector2 thirdControlPoint, Vector2 point)
-        {
-            var last = _positions.Count - 1;
-            _handlesOut[last] = Flip(secondControlPoint);
-            AddAnchor(point, handleIn: Flip(thirdControlPoint));
-        }
-
-        public void EndFigure()
-        {
-            var count = _positions.Count - _figureStart;
-            if (count < 2)
-            {
-                // Degenerate figure - drop it
-                _positions.RemoveRange(_figureStart, count);
-                _handlesIn.RemoveRange(_figureStart, count);
-                _handlesOut.RemoveRange(_figureStart, count);
                 return;
-            }
 
-            // Fonts close explicitly by returning to the start; fold that into the closed flag
-            var first = _positions[_figureStart];
-            var last = _positions.Count - 1;
-            if (Vector3.DistanceSquared(_positions[last], first) < 1e-10f)
+            // Pivot from the glyph bounds, consistent with the SixLabors implementation
+            var (minX, minY, maxX, maxY) = ComputeBounds(startPositionCount, _positions.Count);
+            var pivotX = minX + (maxX - minX) * (_pivot.X + 1f) * 0.5f;
+            var pivotY = minY + (maxY - minY) * (_pivot.Y + 1f) * 0.5f;
+
+            _parts.Add(new CurvePart(contourStart, contourCount, new Vector3(pivotX, pivotY, 0), _parts.Count, charIndex));
+            _codePoints.Add(codePoint);
+            _glyphIds.Add(glyphId);
+            _charIndices.Add(charIndex);
+            _wordIndices.Add(wordIndex);
+            _lineIndices.Add(lineIndex);
+            _advances.Add(advance);
+        }
+
+        private (float MinX, float MinY, float MaxX, float MaxY) ComputeBounds(int start, int end)
+        {
+            var minX = float.MaxValue;
+            var minY = float.MaxValue;
+            var maxX = float.MinValue;
+            var maxY = float.MinValue;
+
+            for (var i = start; i < end; i++)
             {
-                _handlesIn[_figureStart] = _handlesIn[last];
-                _positions.RemoveAt(last);
-                _handlesIn.RemoveAt(last);
-                _handlesOut.RemoveAt(last);
+                var p = _positions[i];
+                if (p.X < minX) minX = p.X;
+                if (p.Y < minY) minY = p.Y;
+                if (p.X > maxX) maxX = p.X;
+                if (p.Y > maxY) maxY = p.Y;
+
+                var hIn = _handlesIn[i];
+                if (hIn.X < minX) minX = hIn.X;
+                if (hIn.Y < minY) minY = hIn.Y;
+                if (hIn.X > maxX) maxX = hIn.X;
+                if (hIn.Y > maxY) maxY = hIn.Y;
+
+                var hOut = _handlesOut[i];
+                if (hOut.X < minX) minX = hOut.X;
+                if (hOut.Y < minY) minY = hOut.Y;
+                if (hOut.X > maxX) maxX = hOut.X;
+                if (hOut.Y > maxY) maxY = hOut.Y;
             }
 
-            _contourOffsets.Add(_positions.Count);
-            _contourClosed.Add(true);
+            return (minX, minY, maxX, maxY);
         }
 
-        public void BeginText(in FontRectangle bounds)
+        private void AddAnchor(double x, double y, Vector3? handleIn = null)
         {
-        }
-
-        public void EndText()
-        {
-        }
-
-        public TextDecorations EnabledDecorations() => TextDecorations.None;
-
-        private void AddAnchor(Vector2 point, Vector3? handleIn = null)
-        {
-            var position = Flip(point);
+            var position = new Vector3((float)x, (float)y, 0);
             _positions.Add(position);
             _handlesIn.Add(handleIn ?? position);
             _handlesOut.Add(position);
         }
 
-        private static Vector3 Flip(Vector2 p) => new(p.X, -p.Y, 0);
+        private static Vector3 Flip(double x, double y, double penX, double penY) =>
+            new((float)(x + penX), (float)(-y + penY), 0);
+
+        // ---- Subdivision (identical to TextToCurves) ----
 
         /// <summary>Moves the text cursor to the next occurrence of the glyph's code point, counting words and lines passed.</summary>
-        private void AdvanceTextCursorTo(CodePoint codePoint)
-        {
-            var search = _textCursor;
-            while (search < _text.Length)
-            {
-                if (System.Text.Rune.DecodeFromUtf16(_text.AsSpan(search), out var rune, out var consumed) != System.Buffers.OperationStatus.Done)
-                {
-                    consumed = 1;
-                    rune = System.Text.Rune.ReplacementChar;
-                }
 
-                if (rune.Value == codePoint.Value)
-                {
-                    // Count the whitespace and line breaks skipped between the previous glyph and this one
-                    for (var i = _textCursor; i < search; i++)
-                    {
-                        if (_text[i] == '\n')
-                        {
-                            _lineIndex++;
-                            _wordIndex++;
-                        }
-                        else if (char.IsWhiteSpace(_text[i]) && (i == 0 || !char.IsWhiteSpace(_text[i - 1])))
-                        {
-                            _wordIndex++;
-                        }
-                    }
-
-                    _charIndex = search;
-                    _textCursor = search + consumed;
-                    return;
-                }
-
-                search += consumed;
-            }
-
-            // Not found (ligature or fallback glyph): keep the running indices
-        }
 
         /// <summary>Rough length of a cubic from its control polygon and chord.</summary>
         private static float ApproximateCubicLength(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
@@ -660,20 +669,6 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
             return oldToNew;
         }
 
-        private string _text = string.Empty;
-        private int _textCursor;
-        private int _charIndex;
-        private int _wordIndex;
-        private int _lineIndex;
-        private int _figureStart;
-        private int _glyphContourStart;
-        FontRectangle _glyphBounds;
-        private int _glyphCodePoint;
-        private int _glyphId;
-        private Vector2 _pivot;
-        private float _maxEdgeLength;
-        private bool _evenSpacing;
-
         private readonly List<Vector3> _positions = [];
         private readonly List<Vector3> _handlesIn = [];
         private readonly List<Vector3> _handlesOut = [];
@@ -686,7 +681,9 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
         private readonly List<int> _wordIndices = [];
         private readonly List<int> _lineIndices = [];
         private readonly List<float> _advances = [];
-        private readonly List<Vector3> _pivots = [];
+        private Vector2 _pivot;
+        private float _maxEdgeLength;
+        private bool _evenSpacing;
     }
 
     public IStatusProvider.StatusLevel GetStatusLevel()
@@ -694,18 +691,12 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
         return string.IsNullOrEmpty(_warningMessage) ? IStatusProvider.StatusLevel.Success : IStatusProvider.StatusLevel.Warning;
     }
 
-    public string GetStatusMessage()
-    {
-        return _warningMessage;
-    }
+    public string GetStatusMessage() => _warningMessage;
 
     public InputSlot<string> SourcePathSlot => Path;
 
     private readonly Resource<LoadedFont> _resource;
     private readonly OutlineCollector _collector = new();
-#if SIXLABORS_FONTS_V3
-    private readonly List<FontVariation> _variations = [];
-#endif
     private readonly CurveGeometry _output = new();
     private string _warningMessage = string.Empty;
 
@@ -744,5 +735,4 @@ internal sealed class TextToCurves : Instance<TextToCurves>, IDescriptiveFilenam
 
     [Input(Guid = "b8d3f5a2-9e41-4c76-8a0b-5d2f7c9e1a34")]
     public readonly InputSlot<bool> EvenSpacing = new();
-
 }

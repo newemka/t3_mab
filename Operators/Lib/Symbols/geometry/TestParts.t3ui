@@ -1,0 +1,31 @@
+{
+  "FormatVersion": 3,
+  "Id": "7b148d3a-ba50-4f91-ae75-42d157e50877"/*TestParts*/,
+  "Description": "",
+  "InputUis": [
+    {
+      "InputId": "d4d3fe09-0054-4708-92c8-87c84e34f61d"/*Geometry*/,
+      "Position": {
+        "X": -200.0,
+        "Y": 0.0
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "6dc9ffe2-8986-48d3-ba62-70576b9b5ba6"/*Result*/,
+      "Position": {
+        "X": 300.0,
+        "Y": 200.0
+      }
+    },
+    {
+      "OutputId": "37e50eb4-23c6-4a65-a71a-f3f23e8800a4"/*PartCount*/,
+      "Position": {
+        "X": 300.0,
+        "Y": 300.0
+      }
+    }
+  ]
+}

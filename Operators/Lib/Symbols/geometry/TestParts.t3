@@ -1,0 +1,12 @@
+{
+  "FormatVersion": 3,
+  "Id": "7b148d3a-ba50-4f91-ae75-42d157e50877"/*TestParts*/,
+  "Inputs": [
+    {
+      "Id": "d4d3fe09-0054-4708-92c8-87c84e34f61d"/*Geometry*/,
+      "DefaultValue": null
+    }
+  ],
+  "Children": [],
+  "Connections": []
+}
