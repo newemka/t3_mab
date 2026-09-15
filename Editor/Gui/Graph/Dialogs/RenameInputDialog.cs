@@ -1,4 +1,4 @@
-﻿using ImGuiNET;
+using ImGuiNET;
 using T3.Core.Operator;
 using T3.Editor.Gui.Dialogs;
 using T3.Editor.Gui.Input;
@@ -25,10 +25,37 @@ internal sealed class RenameInputDialog : ModalDialog
 
     private static void DrawContent()
     {
+        var symbol = _symbol;
+        if (symbol == null)
+        {
+            ImGui.CloseCurrentPopup();
+            return;
+        }
+
+        switch (_renameGate.Update("Renaming input…", "Rebuilding symbol package. This can take a few seconds."))
+        {
+            case BlockingActionGate.Phase.ShowMessage:
+                return;
+
+            case BlockingActionGate.Phase.Run:
+                var inputDef = symbol.InputDefinitions.FirstOrDefault(i => i.Id == _inputId);
+                if (inputDef == null)
+                {
+                    ImGui.TextUnformatted("invalid input");
+                    return;
+                }
+
+                // Blocking (~3s): rebuild + assembly reload. User already saw the wait message.
+                UndoRedoStack.AddAndExecute(
+                    new RenameSlotCommand(symbol.Id, _inputId, inputDef.Name,
+                                          _pendingInputName, isInput: true));
+                ImGui.CloseCurrentPopup();
+                return;
+        }
+
         var isWindowAppearing = ImGui.IsWindowAppearing();
 
         FormInputs.SetIndentToLeft();
-        var symbol = _symbol;
         FormInputs.AddHint($"Careful! This operation will modify the definition of {symbol.Name}.");
         if (symbol.Namespace.StartsWith("Lib"))
         {
@@ -36,41 +63,30 @@ internal sealed class RenameInputDialog : ModalDialog
         }
 
         FormInputs.SetIndentToParameters();
-        var inputDef = symbol.InputDefinitions.FirstOrDefault(i => i.Id == _inputId);
-        if (inputDef == null)
-        {
-            ImGui.TextUnformatted("invalid input");
-            return;
-        }
 
         if (isWindowAppearing)
         {
-            _newInputName = inputDef.Name;
+            var inputDef = symbol.InputDefinitions.FirstOrDefault(i => i.Id == _inputId);
+            if (inputDef != null)
+                _newInputName = inputDef.Name;
         }
 
-        // ImGui.SetNextItemWidth(150);
-
-        //var warning = String.Empty;
-        var changed = SymbolModificationInputs.DrawFieldNameInput(symbol, "New Input name", "Input", ref _newInputName, out var isValid);
-
-        if (isValid && (isWindowAppearing || changed))
-        {
-        }
+        SymbolModificationInputs.DrawFieldNameInput(symbol, "New Input name", "Input",
+                                                    ref _newInputName, out var isValid);
 
         if (isWindowAppearing)
         {
             ImGui.SetKeyboardFocusHere();
         }
-        
+
         FormInputs.ApplyIndent();
 
-        if (CustomComponents.DrawCtaButton("Rename input", isValid))
+        if (CustomComponents.DrawCtaButton("Rename input", isValid, enableTriggerWithReturn: true))
         {
-            // Validate with a dry run before committing the recompile to the undo stack.
             if (InputsAndOutputs.RenameInput(symbol, _inputId, _newInputName, dryRun: true, out _))
             {
-                UndoRedoStack.AddAndExecute(new RenameSlotCommand(symbol.Id, _inputId, inputDef.Name, _newInputName, isInput: true));
-                ImGui.CloseCurrentPopup();
+                _pendingInputName = _newInputName;
+                _renameGate.Arm();
             }
         }
 
@@ -88,7 +104,9 @@ internal sealed class RenameInputDialog : ModalDialog
         _inputId = inputId;
     }
 
+    private static readonly BlockingActionGate _renameGate = new();
     private static Symbol _symbol;
     private static Guid _inputId;
     private static string _newInputName = string.Empty;
+    private static string _pendingInputName = string.Empty;
 }
