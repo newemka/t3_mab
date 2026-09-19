@@ -1,0 +1,134 @@
+{
+  "FormatVersion": 3,
+  "Id": "8bf9a286-00f8-4428-b046-8c92608a8cb9"/*CurvesToGeometryExp*/,
+  "Description": "Fills closed curves into solid geometry and optionally extrudes them with a bevel - the way from [TextToCurves] to solid 3D text. The result is CPU geometry, so put [GeometryToMesh] after it to draw it.\n\nDepth 0 gives a flat fill; with Depth, front and back caps are joined by walls, and Bevel rounds (or with BevelSegments 1 chamfers) the edges. Overlapping and nested contours are resolved by the fill rule (non-zero by default, EvenOdd as option), so variable-font overlaps disappear. One mesh part per curve part (glyph), with the curve's part attributes carried over for [ColorFacesFromAttribute] and [GeometryToMeshChunks]; the face attribute IsSide marks walls and bevels. Walls and bevels are smooth shaded along round outlines and hard at corners sharper than SmoothAngle; FlatShading makes every wall and bevel facet flat. Weight offsets the outline outwards (negative: inwards) for a faux bold or light look; it thickens stems and shrinks counters, so it stays convincing only for small amounts. Tolerance is the flattening precision. Keep Bevel below half of the thinnest stroke: a larger bevel folds the inset outline over itself and opens the surface.\n\nAKA: extrude text, 3d text, fill curves, tessellate, curves to mesh",
+  "InputUis": [
+    {
+      "InputId": "3d7b7c7a-8e11-4b9a-8b7e-3e8a4a6f2b91"/*SideLoops*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 390.0
+      }
+    },
+    {
+      "InputId": "49a4f679-5972-4908-88e8-ad6df75cd136"/*Back*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 270.0
+      }
+    },
+    {
+      "InputId": "558ea40a-6f10-4492-8397-0797330828d7"/*Weight*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 157.0
+      },
+      "Scale": 0.01
+    },
+    {
+      "InputId": "5e4a8c13-2a6f-4a9c-9b17-6d5e2f0a4c31"/*CapPointSpacing*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 465.0
+      },
+      "Min": 0.01,
+      "ClampMin": true
+    },
+    {
+      "InputId": "6e6a20b5-3186-47e2-9988-5cdebf94144c"/*Sides*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 315.0
+      }
+    },
+    {
+      "InputId": "899737c5-4808-4a51-a324-57eae064a992"/*Front*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 225.0
+      }
+    },
+    {
+      "InputId": "92deeaa6-8a68-4825-b5a5-433f6f7b5860"/*FlatShading*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 165.0
+      }
+    },
+    {
+      "InputId": "9f288f63-246f-4fd1-aafa-df53f4928f09"/*Bevel*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 90.0
+      },
+      "Scale": 0.01
+    },
+    {
+      "InputId": "a44581dc-7662-4cf7-8ef9-6b701a76afb7"/*SmoothAngle*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 170.0
+      },
+      "Min": 0.0,
+      "Max": 180.0,
+      "Scale": 1.8,
+      "ClampMin": true,
+      "ClampMax": true
+    },
+    {
+      "InputId": "a7577b2c-e136-43d2-a97c-7b5e3936e093"/*Tolerance*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 180.0
+      },
+      "Scale": 0.01
+    },
+    {
+      "InputId": "ac693c5a-8f70-452e-aaad-658f164fd435"/*Depth*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 45.0
+      },
+      "Scale": 0.01
+    },
+    {
+      "InputId": "ada0ec23-23a8-41f3-bd13-cc072504bb76"/*EvenOdd*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 360.0
+      }
+    },
+    {
+      "InputId": "ef46d435-efac-4ea7-981a-638ee0bdd784"/*CapPointDistribution*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 540.0
+      }
+    },
+    {
+      "InputId": "ef97def6-b575-4328-94f4-efed5d3fba8d"/*Curves*/,
+      "Relevancy": "Required",
+      "Position": {
+        "X": 0.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "InputId": "f8b5a3d9-d50c-4edb-92c4-dd5a75cb1188"/*BevelSegments*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 135.0
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "80c53c5b-5ab6-4a97-aa6e-3c2f5640bd88"/*Result*/,
+      "Position": {
+        "X": 300.0,
+        "Y": 0.0
+      }
+    }
+  ]
+}

@@ -22,6 +22,22 @@ internal sealed class GeometryMeshCompiler
     /// <summary>One chunk per part in part order; a single whole-mesh chunk for part-less geometry.</summary>
     public MeshChunkDef[] Chunks { get; private set; } = [];
 
+    private readonly record struct VertexKey(
+    int Point,
+    int Nx, int Ny, int Nz,
+    int U, int V,
+    int R, int G, int B, int A);
+
+    private readonly Dictionary<VertexKey, int> _weldLookup = new();
+    private PbrVertex[] _vertexScratch = [];
+
+    private static int Quantize(float v) => (int)MathF.Round(v * 1e5f);
+    private static VertexKey MakeKey(int point, Vector3 n, Vector2 uv, Vector4 c) =>
+        new(point,
+            Quantize(n.X), Quantize(n.Y), Quantize(n.Z),
+            Quantize(uv.X), Quantize(uv.Y),
+            Quantize(c.X), Quantize(c.Y), Quantize(c.Z), Quantize(c.W));
+
     /// <summary>
     /// Compiles <paramref name="geometry"/>. With <paramref name="relativeToPartPivots"/> the vertex
     /// positions of every part are expressed relative to its pivot, so a chunk draw can place
@@ -56,57 +72,70 @@ internal sealed class GeometryMeshCompiler
         var positions = geometry.Positions;
         var offsets = geometry.FaceCornerOffsets;
         var cornerPoints = geometry.CornerPointIndices;
-        var vertices = Vertices;
-        var triangles = Triangles;
+        var parts = geometry.Parts;
+        var partCount = parts.Length > 0 ? parts.Length : 1;
 
+       // var triangleCount = geometry.GetTriangleCount();
+        if (Triangles.Length != triangleCount)
+            Triangles = new Int3[triangleCount];
+        if (_vertexScratch.Length < geometry.CornerCount)
+            _vertexScratch = new PbrVertex[geometry.CornerCount];
+
+        if (Chunks.Length != partCount)
+            Chunks = new MeshChunkDef[partCount];
+
+        var vertexCount = 0;
         var triangleIndex = 0;
-        for (var faceIndex = 0; faceIndex < geometry.FaceCount; faceIndex++)
+        var localIndices = new int[16]; // grows as needed per face
+
+        for (var partIndex = 0; partIndex < partCount; partIndex++)
         {
-            var start = offsets[faceIndex];
-            var end = offsets[faceIndex + 1];
-            var faceCornerCount = end - start;
-            if (faceCornerCount < 3)
-                continue;
-
-            // Face normal as fallback for meshes without a corner normal attribute (Newell's method handles N-gons)
-            var faceNormal = Vector3.Zero;
-            for (var c = start; c < end; c++)
+            int faceStart, faceEnd;
+            var pivot = Vector3.Zero;
+            if (parts.Length > 0)
             {
-                var next = c + 1 == end ? start : c + 1;
-                var p0 = positions[cornerPoints[c]];
-                var p1 = positions[cornerPoints[next]];
-                faceNormal += new Vector3((p0.Y - p1.Y) * (p0.Z + p1.Z),
-                                          (p0.Z - p1.Z) * (p0.X + p1.X),
-                                          (p0.X - p1.X) * (p0.Y + p1.Y));
+                faceStart = parts[partIndex].FaceStart;
+                faceEnd = Math.Min(faceStart + parts[partIndex].FaceCount, geometry.FaceCount);
+                pivot = parts[partIndex].Pivot;
+            }
+            else
+            {
+                faceStart = 0;
+                faceEnd = geometry.FaceCount;
             }
 
-            faceNormal = faceNormal.LengthSquared() > 1e-10f ? Vector3.Normalize(faceNormal) : Vector3.UnitY;
+            var partVertexStart = vertexCount;
+            var partTriangleStart = triangleIndex;
+            _weldLookup.Clear();
 
-            var faceColor = Vector4.One;
-            if (faceColors != null)
-                faceColor = faceColors.Values[faceIndex];
-            else if (partColors != null)
-                faceColor = _faceToPart[faceIndex] >= 0 ? partColors.Values[_faceToPart[faceIndex]] : Vector4.One;
-
-            for (var c = start; c < end; c++)
+            for (var faceIndex = faceStart; faceIndex < faceEnd; faceIndex++)
             {
-                var normal = cornerNormals != null ? cornerNormals.Values[c] : faceNormal;
-                var uv = cornerUvs != null ? cornerUvs.Values[c] : Vector2.Zero;
-                var color = cornerColors != null ? cornerColors.Values[c] : faceColor;
+                var start = offsets[faceIndex];
+                var end = offsets[faceIndex + 1];
+                var faceCornerCount = end - start;
+                if (faceCornerCount < 3)
+                    continue;
 
-                vertices[c] = new PbrVertex
-                                  {
-                                      Position = positions[cornerPoints[c]],
-                                      Normal = normal,
-                                      Texcoord = uv,
-                                      Texcoord2 = uv,
-                                      Selection = 1,
-                                      ColorRgb = new Vector3(color.X, color.Y, color.Z),
-                                  };
-            }
+                // Face normal (unchanged Newell code)
+                var faceNormal = Vector3.Zero;
+                for (var c = start; c < end; c++)
+                {
+                    var next = c + 1 == end ? start : c + 1;
+                    var p0 = positions[cornerPoints[c]];
+                    var p1 = positions[cornerPoints[next]];
+                    faceNormal += new Vector3((p0.Y - p1.Y) * (p0.Z + p1.Z),
+                                              (p0.Z - p1.Z) * (p0.X + p1.X),
+                                              (p0.X - p1.X) * (p0.Y + p1.Y));
+                }
+                faceNormal = faceNormal.LengthSquared() > 1e-10f ? Vector3.Normalize(faceNormal) : Vector3.UnitY;
 
-            // Tangent basis from the face's first triangle - exact for planar faces
-            {
+                var faceColor = Vector4.One;
+                if (faceColors != null)
+                    faceColor = faceColors.Values[faceIndex];
+                else if (partColors != null)
+                    faceColor = _faceToPart[faceIndex] >= 0 ? partColors.Values[_faceToPart[faceIndex]] : Vector4.One;
+
+                // Per-face TBN (unchanged; still from the first triangle, still overwritten later by RecomputeNormals)
                 var c0 = start;
                 var c1 = start + 1;
                 var c2 = start + 2;
@@ -120,21 +149,64 @@ internal sealed class GeometryMeshCompiler
                     bitangent = Vector3.Cross(faceNormal, tangent);
                 }
 
-                for (var c = start; c < end; c++)
+                if (localIndices.Length < faceCornerCount)
+                    localIndices = new int[faceCornerCount];
+
+                for (var i = 0; i < faceCornerCount; i++)
                 {
-                    vertices[c].Tangent = tangent;
-                    vertices[c].Bitangent = bitangent;
+                    var c = start + i;
+                    var normal = cornerNormals != null ? cornerNormals.Values[c] : faceNormal;
+                    var uv = cornerUvs != null ? cornerUvs.Values[c] : Vector2.Zero;
+                    var color = cornerColors != null ? cornerColors.Values[c] : faceColor;
+                    var pointIndex = cornerPoints[c];
+
+                    var key = MakeKey(pointIndex, normal, uv, color);
+                    if (_weldLookup.TryGetValue(key, out var existing))
+                    {
+                        localIndices[i] = existing;
+                        continue;
+                    }
+
+                    var position = positions[pointIndex];
+                    if (relativeToPartPivots)
+                        position -= pivot;
+
+                    var vi = vertexCount++;
+                    if (vi >= _vertexScratch.Length)
+                        Array.Resize(ref _vertexScratch, _vertexScratch.Length * 2);
+                    _vertexScratch[vi] = new PbrVertex
+                    {
+                        Position = position,
+                        Normal = normal,
+                        Texcoord = uv,
+                        Texcoord2 = uv,
+                        Selection = 1,
+                        ColorRgb = new Vector3(color.X, color.Y, color.Z),
+                        Tangent = tangent,
+                        Bitangent = bitangent,
+                    };
+                    _weldLookup[key] = vi;
+                    localIndices[i] = vi;
+                }
+
+                for (var i = 1; i < faceCornerCount - 1; i++)
+                {
+                    Triangles[triangleIndex++] = new Int3(localIndices[0], localIndices[i], localIndices[i + 1]);
                 }
             }
 
-            // Fan triangulation (assumes convex faces - sufficient until a real triangulator lands)
-            for (var i = 1; i < faceCornerCount - 1; i++)
+            Chunks[partIndex] = new MeshChunkDef
             {
-                triangles[triangleIndex++] = new Int3(start, start + i, start + i + 1);
-            }
+                StartFaceIndex = partTriangleStart,
+                FaceCount = triangleIndex - partTriangleStart,
+                StartVertexIndex = partVertexStart,
+                VertexCount = vertexCount - partVertexStart,
+            };
         }
 
-        BuildChunks(geometry, relativeToPartPivots);
+        if (Vertices.Length != vertexCount)
+            Vertices = new PbrVertex[vertexCount];
+        Array.Copy(_vertexScratch, Vertices, vertexCount);
     }
 
     private void BuildChunks(MeshGeometry geometry, bool relativeToPartPivots)
