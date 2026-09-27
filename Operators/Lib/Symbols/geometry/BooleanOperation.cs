@@ -384,9 +384,15 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
     /// <summary>
     /// Corner-domain attributes carried through the kernel. Every operand is loaded against one
-    /// shared schema - the union of all operands' corner attributes - so a corner keeps its UVs and
-    /// weights from whichever fragment it came from, and the emitter can write one typed buffer per
-    /// name without having to reconcile columns of different widths.
+    /// shared schema, so a corner keeps the attributes of whichever fragment it came from and the
+    /// emitter writes one typed buffer per name without reconciling columns of different widths.
+    ///
+    /// <para>Only attributes that <em>every</em> contributing operand carries are kept. An attribute
+    /// that one operand has and another does not would have to be invented for the second, and there is
+    /// no safe invented value: a zero <c>Normal</c> is unlit and a zero <c>Tangent</c> makes the draw
+    /// shader's normalized TBN degenerate, which paints the face black. Dropping the attribute instead
+    /// lets every consumer fall back to the value it derives from the geometry, which is exactly what it
+    /// does for input that never had the attribute.</para>
     /// </summary>
     private sealed class AttributeSchema
     {
@@ -397,9 +403,16 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         {
             var schema = new AttributeSchema();
             Collect(left, schema);
+
             for (var i = 0; i < rights.Count; i++)
             {
-                Collect(rights[i], schema);
+                // An operand with no faces contributes nothing to the result, so it must not narrow the
+                // schema either.
+                var right = rights[i];
+                if (right == null || right.FaceCount == 0)
+                    continue;
+
+                schema.RetainOnlyIn(right);
             }
 
             return schema;
@@ -421,6 +434,39 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
                 schema.Register(attribute.Name, elementSize);
             }
+        }
+
+        /// <summary>Drops every column <paramref name="source"/> does not carry itself.</summary>
+        private void RetainOnlyIn(MeshGeometry source)
+        {
+            for (var i = Columns.Count - 1; i >= 0; i--)
+            {
+                var column = Columns[i];
+                var found = false;
+                foreach (var attribute in source.Attributes)
+                {
+                    if (attribute.Domain != AttributeDomain.Corner
+                        || !string.Equals(attribute.Name, column.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    found = ElementSizeOf(attribute) == column.ElementSize;
+                    break;
+                }
+
+                if (!found)
+                    Columns.RemoveAt(i);
+            }
+
+            var offset = 0;
+            foreach (var column in Columns)
+            {
+                column.Offset = offset;
+                offset += column.ElementSize;
+            }
+
+            ComponentCount = offset;
         }
 
         /// <summary>Binds each column to the source's own attribute of that name, once per solid.</summary>
@@ -525,7 +571,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     {
         public readonly string Name = name;
         public readonly int ElementSize = elementSize;
-        public readonly int Offset = offset;
+        public int Offset = offset;
     }
 
     // ------------------------------------------------------------------ loading operands
@@ -1233,7 +1279,12 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
             var tolerance = _gridTolerance;
             var toleranceSq = tolerance * tolerance;
-                        var touched = 0;
+
+            // How close to an edge's end a point may sit and still be worth inserting. This is the weld
+            // radius, not the (larger) on-edge tolerance: further than the weld radius from the end it is
+            // a real subdivision of the edge, inside it it simply is that end.
+            var endSlack = _weld.Tolerance;
+            var touched = 0;
             foreach (var polygon in polygons)
             {
                 var count = polygon.CornerCount;
@@ -1250,7 +1301,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                     _repairedVertices.Add(a);
 
                     _edgeHits.Clear();
-                    CollectPointsOnEdge(a, b, cell, tolerance, toleranceSq);
+                    CollectPointsOnEdge(a, b, cell, tolerance, toleranceSq, endSlack);
                     if (_edgeHits.Count == 0)
                         continue;
 
@@ -1277,7 +1328,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         /// uniform grid sampled along the segment, so the cost follows the number of cells the edge
         /// crosses rather than the number of points in the mesh.
         /// </summary>
-        private void CollectPointsOnEdge(in Vert a, in Vert b, float cell, float tolerance, float toleranceSq)
+        private void CollectPointsOnEdge(in Vert a, in Vert b, float cell, float tolerance, float toleranceSq, float endSlack)
         {
             var direction = b.Position - a.Position;
             var lengthSq = direction.LengthSquared();
@@ -1305,10 +1356,11 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                         var position = _weld.Positions[pointId];
                         var t = Vector3.Dot(position - a.Position, direction) / lengthSq;
 
-                        // Keep clear of the ends by the same slack: a point that close is an endpoint
-                        // after welding, and inserting it would only add a negligible edge.
+                        // Keep clear of the ends by the weld radius only. The on-edge tolerance is larger,
+                        // and guarding the ends with it would reject exactly the subdivision that matters
+                        // here: a point sitting a hair past the last corner of the neighbouring face.
                         var along = t * length;
-                        if (along <= tolerance || length - along <= tolerance)
+                        if (along <= endSlack || length - along <= endSlack)
                             continue;
 
                         if (Vector3.DistanceSquared(a.Position + direction * t, position) > toleranceSq)
@@ -1833,6 +1885,11 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
     /// <summary>Planarity threshold of a face, relative to its longest edge.</summary>
     private const float PlanarityTolerance = 1e-4f;
+
+    /// <summary>
+    /// Face area, as a fraction of the squared extent, below which a polygon is a sliver. Eight orders of
+    /// magnitude under a real face, so it only ever catches the debris of a near-tangent cut.
+    /// </summary>
 
     /// <summary>
     /// How far off an edge a point may sit and still be treated as lying on it during the T-junction
