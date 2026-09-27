@@ -6,7 +6,13 @@
     <Nullable>enable</Nullable>
     <UserSecretsId>4ddcedc9-2c55-476d-9aeb-8e069ecd278a</UserSecretsId>
     <Configurations>Debug;Release</Configurations>
-    <Platforms>AnyCPU</Platforms>
+    <Platforms>AnyCPU;x64</Platforms>
+    <!-- CppSharp.Runtime (1.1.84.17100) is a C++/CLI mixed-mode assembly that is built for AMD64 only
+         (PE32+, machine 0x8664, ILONLY unset), as is the native mediapipe_c.dll it interops with.
+         Building this project as MSIL/AnyCPU triggers MSB3270 and would fail at runtime on a 32-bit host,
+         so pin the actual target to x64 while keeping the "Any CPU" solution platform working. -->
+    <PlatformTarget Condition="'$(Platform)' == 'AnyCPU' Or '$(Platform)' == 'Any CPU'">x64</PlatformTarget>
+    <PlatformTarget Condition="'$(PlatformTarget)' == ''">x64</PlatformTarget>
     <VersionPrefix>1.0.5</VersionPrefix>
     <HomeGuid>00000000-0000-0000-0000-000000000000</HomeGuid>
     <EditorVersion>$(TixlVersion)</EditorVersion>

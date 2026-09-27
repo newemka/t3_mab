@@ -19,8 +19,9 @@
 
 ## Build Verification
 
-- After any code change, run `dotnet build` on the affected project before reporting done.
-- Check for build errors and fix them before proceeding.
+- After any code change, build the affected project with `.\Scripts\build.ps1 -Project <path>` before reporting done. It wraps `dotnet build` with the node-reuse workaround that restricted shells need — a plain `dotnet build` can fail here with `0 Warning(s), 0 Error(s)` and no diagnostic.
+- Check for build errors and fix them before proceeding. Trust the exit code, not the warning/error counts.
+- Build the configuration the running editor is *not* using, or it will fight you over file locks.
 
 ## Project Conventions
 

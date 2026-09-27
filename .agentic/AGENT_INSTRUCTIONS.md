@@ -1,4 +1,4 @@
-﻿# Agent Instructions for TiXL
+# Agent Instructions for TiXL
 
 ## Mission
 Contribute to **TiXL** with a focus on:
@@ -13,6 +13,21 @@ Use these sources first when behavior or conventions are unclear:
 - Operator conventions: https://github.com/tixl3d/tixl/wiki/dev.OperatorConventions
 
 If documentation and implementation differ, follow local code patterns in the affected project unless a task explicitly asks for broader refactoring.
+
+## Building
+
+Build with `.\Scripts\build.ps1` (defaults to `t3.sln`, Release). Pass `-Project` to scope
+it, `-Configuration Debug` for a faster loop, `-Run` to launch the editor afterwards.
+Build the configuration the running editor is **not** using, or it will fight you over
+file locks.
+
+**MSBuild's out-of-process build node handshake fails under a confined sandbox or a
+locked-down account, and it fails silently** — the command exits 1 with
+`0 Warning(s), 0 Error(s)` and no diagnostic, which reads like a broken project and sends
+you hunting through the code for nothing. `build.ps1` passes `-nodeReuse:false -m:1` to
+keep the build in-process, which fixes it. Apply the same two arguments to any raw
+`dotnet restore` / `dotnet build` you run by hand, and **trust the exit code over the
+warning/error counts** when diagnosing a build.
 
 ## Solution Structure (Key Projects)
 - `Core/` - Shared functionality between Editor and Player

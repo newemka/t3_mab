@@ -9,7 +9,12 @@
     <RootNamespace>Lib</RootNamespace>
     <AssemblyName>$(RootNamespace)</AssemblyName>
     <Configurations>Debug;Release</Configurations>
-    <Platforms>AnyCPU</Platforms>
+    <Platforms>AnyCPU;x64</Platforms>
+    <!-- This package references Mediapipe (see the ProjectReference below), which must target x64 because
+         CppSharp.Runtime is an AMD64-only C++/CLI mixed-mode assembly. Building this project as MSIL/AnyCPU
+         would re-raise MSB3270 against that x64 reference, so pin this project to x64 as well. -->
+    <PlatformTarget Condition="'$(Platform)' == 'AnyCPU' Or '$(Platform)' == 'Any CPU'">x64</PlatformTarget>
+    <PlatformTarget Condition="'$(PlatformTarget)' == ''">x64</PlatformTarget>
     <VersionPrefix>1.672.1000</VersionPrefix>
     <HomeGuid>00000000-0000-0000-0000-000000000000</HomeGuid>
     <EditorVersion>4.3.0</EditorVersion>

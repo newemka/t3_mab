@@ -19,6 +19,14 @@ Editor/bin/Debug/net10.0-windows/TiXL.exe --debug-server 9042 --window 1600x900 
 - A running server shows a blinking IO icon in the app title bar; its tooltip lists recent
   protocol messages — useful when a human is watching an agent session.
 
+If the build is stale or `TiXL.exe` is missing, use `.\Scripts\build.ps1 -Project
+Editor/Editor.csproj -Configuration Debug -Run`, which restores and builds with the
+node-reuse workaround that restricted shells need and then launches the editor.
+
+The editor writes `T3_ASSEMBLY_PATH` to the user environment on startup. Where that write
+is denied — a confined sandbox or a locked-down account — launching it needs escalated
+permissions; the failure is otherwise a `TypeInitializationException` during startup.
+
 ## Transport
 
 JSON lines over TCP on `127.0.0.1:<port>`. One request per line, one response per line:
