@@ -1,0 +1,60 @@
+{
+  "FormatVersion": 3,
+  "Id": "3f9a1d64-7c25-4b8e-9a13-6e5d84c07b21"/*BooleanOperation*/,
+  "Description": "Boolean-combines MeshGeometry solids. EXPERIMENTAL: the solver is unfinished and currently produces open meshes for most cases - do not rely on it yet.\n\nWith nothing connected to Operands the op is a pass-through: it hands Geometry on untouched, including all attributes and the part table, so it is safe to leave in a chain. For Union, Difference and Intersection the intent is to split each operand's faces along the other solid's planes, classify every fragment by a point test, and close the openings with tessellated caps. Vertex identity is carried in one welded point table so cut pieces stay stitched together. All parts of one input count as that one solid, so multi-part geometry such as separated letters or fracture chunks needs no merge step.\n\nKnown state (see [BooleanOperationDiagnostics] for the measured table): two disjoint solids combine correctly, and the coincident-solid difference and intersection cases are exact. Everything that requires an actual cut is currently wrong - results come out with open edges and incorrect volumes. Unattached, overlapping, contained and coincident-union cases are all affected. Solids are expected to be closed; the op warns when the result is not watertight.\n\nAKA: CSG, subtract, cut out, merge, intersect",
+  "InputUis": [
+    {
+      "InputId": "1a7c5e20-9b34-4d61-8f52-70c3e1a8d946"/*Geometry*/,
+      "Relevancy": "Required",
+      "Position": {
+        "X": 0.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "InputId": "6d2f8a13-4c70-49b5-b8e1-35a7d0c9264f"/*Operands*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 45.0
+      }
+    },
+    {
+      "InputId": "c58b3e71-2d94-4a06-9f38-1b6e7c4d5a29"/*Operation*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 90.0
+      }
+    },
+    {
+      "InputId": "9e14f7b6-8a02-4d53-b0c9-47e2a5b1c803"/*SplitIntoParts*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 135.0
+      }
+    },
+    {
+      "InputId": "2b96c4d8-51e3-4f27-a6b0-83d1e95c7a46"/*Async*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 180.0
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "b47c0e19-3a86-4d52-8f71-2c9e5b0d4138"/*Result*/,
+      "Position": {
+        "X": 300.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "OutputId": "e13b7d05-6c48-42a9-95f0-8d2c4a71b6e3"/*PartCount*/,
+      "Position": {
+        "X": 300.0,
+        "Y": 100.0
+      }
+    }
+  ]
+}

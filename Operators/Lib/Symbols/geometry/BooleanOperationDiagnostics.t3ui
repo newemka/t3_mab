@@ -1,0 +1,45 @@
+{
+  "FormatVersion": 3,
+  "Id": "7c4b1e02-9d38-4a51-8e60-3f2a8d17c549"/*BooleanOperationDiagnostics*/,
+  "Description": "Developer tool: checks the [BooleanOperation] kernel against box pairs whose result volume is known by hand.\n\nSet Run to true to execute the table once. Every case is an axis-aligned box pair - separated, touching, overlapping, contained and coincident - and each is run through union, difference and intersection. For each result the tool reports the face count, the measured volume next to the expected one, and the number of open and non-manifold edges; a case passes only when the result is watertight and the volume matches. The same lines also go to the log with timings, and AllPassed says whether the whole table is green.\n\nThis exists because a boolean is only trustworthy when it is checked numerically: percentages of volume error and single open edges are invisible in a viewport but fatal downstream. Not intended for use in a composition.\n\nAKA: boolean self test, csg check, kernel diagnostics",
+  "InputUis": [
+    {
+      "InputId": "6a3c9f24-8e15-4b70-a2d6-47f1b8e05c93"/*Run*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "InputId": "d5e7b120-3c84-4a26-9f51-68b0d2c7e394"/*Detail*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 45.0
+      }
+    },
+    {
+      "InputId": "8f2b6d41-0a97-4e35-b8c2-5164f7d09e28"/*Only*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 90.0
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "2f8e6a41-5b73-4c09-9d84-71e0a3f6b2d8"/*Report*/,
+      "Position": {
+        "X": 300.0,
+        "Y": 0.0
+      }
+    },
+    {
+      "OutputId": "b1d0c395-7e28-4f6a-83b7-95c2e6d40173"/*AllPassed*/,
+      "Position": {
+        "X": 300.0,
+        "Y": 100.0
+      }
+    }
+  ]
+}

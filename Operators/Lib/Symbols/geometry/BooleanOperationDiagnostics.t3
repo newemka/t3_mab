@@ -1,0 +1,20 @@
+{
+  "FormatVersion": 3,
+  "Id": "7c4b1e02-9d38-4a51-8e60-3f2a8d17c549"/*BooleanOperationDiagnostics*/,
+  "Inputs": [
+    {
+      "Id": "6a3c9f24-8e15-4b70-a2d6-47f1b8e05c93"/*Run*/,
+      "DefaultValue": false
+    },
+    {
+      "Id": "d5e7b120-3c84-4a26-9f51-68b0d2c7e394"/*Detail*/,
+      "DefaultValue": true
+    },
+    {
+      "Id": "8f2b6d41-0a97-4e35-b8c2-5164f7d09e28"/*Only*/,
+      "DefaultValue": ""
+    }
+  ],
+  "Children": [],
+  "Connections": []
+}

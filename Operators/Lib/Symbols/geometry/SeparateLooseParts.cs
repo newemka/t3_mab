@@ -94,23 +94,7 @@ internal sealed class SeparateLooseParts : Instance<SeparateLooseParts>
 
         foreach (var comp in components)
         {
-            // Compute volume centroid for this component.
-            Vector3 pivot = ComputeVolumeCentroid(comp, source);
-            if (pivot.LengthSquared() < 1e-12f)
-            {
-                var usedPoints = new HashSet<int>();
-                foreach (int f in comp)
-                {
-                    int start = source.FaceCornerOffsets[f];
-                    int end = source.FaceCornerOffsets[f + 1];
-                    for (int c = start; c < end; c++)
-                        usedPoints.Add(source.CornerPointIndices[c]);
-                }
-                pivot = Vector3.Zero;
-                foreach (int pi in usedPoints)
-                    pivot += source.Positions[pi];
-                pivot /= usedPoints.Count;
-            }
+            var pivot = MeshVolumeCentroid.Compute(source, comp);
 
             int faceStartIdx = totalFacesAdded;
             int faceCountComp = comp.Count;

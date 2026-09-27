@@ -1,0 +1,28 @@
+{
+  "FormatVersion": 3,
+  "Id": "3f9a1d64-7c25-4b8e-9a13-6e5d84c07b21"/*BooleanOperation*/,
+  "Inputs": [
+    {
+      "Id": "1a7c5e20-9b34-4d61-8f52-70c3e1a8d946"/*Geometry*/,
+      "DefaultValue": null
+    },
+    {
+      "Id": "6d2f8a13-4c70-49b5-b8e1-35a7d0c9264f"/*Operands*/,
+      "DefaultValue": null
+    },
+    {
+      "Id": "c58b3e71-2d94-4a06-9f38-1b6e7c4d5a29"/*Operation*/,
+      "DefaultValue": 0
+    },
+    {
+      "Id": "9e14f7b6-8a02-4d53-b0c9-47e2a5b1c803"/*SplitIntoParts*/,
+      "DefaultValue": false
+    },
+    {
+      "Id": "2b96c4d8-51e3-4f27-a6b0-83d1e95c7a46"/*Async*/,
+      "DefaultValue": true
+    }
+  ],
+  "Children": [],
+  "Connections": []
+}
