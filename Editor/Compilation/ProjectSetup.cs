@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Security;
 using T3.Core.Compilation;
 using T3.Core.Model;
 using T3.Core.Operator;
@@ -50,7 +51,17 @@ internal static partial class ProjectSetup
         if (existing == envValue)
             return;
 
-        Environment.SetEnvironmentVariable(envVar, envValue, EnvironmentVariableTarget.User);
+        // The user-scope write persists the variable for child processes and external tooling, but it
+        // goes through HKCU. A denied registry write must not take down startup - the process-scope
+        // value above is what the editor itself reads.
+        try
+        {
+            Environment.SetEnvironmentVariable(envVar, envValue, EnvironmentVariableTarget.User);
+        }
+        catch (Exception e) when (e is SecurityException or UnauthorizedAccessException or IOException)
+        {
+            Log.Debug($"Could not persist environment variable {envVar} for the user: {e.Message}");
+        }
     }
     public static bool TryCreateProject(string nameSpace,
                                         bool shareResources,
