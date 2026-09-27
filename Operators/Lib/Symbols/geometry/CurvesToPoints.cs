@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using T3.Core.DataTypes.Geometry;
 
 namespace Lib.geometry;
 
@@ -25,6 +26,8 @@ internal sealed class CurvesToPoints : Instance<CurvesToPoints>
         var curves = Curves.GetValue(context);
         var tolerance = MathF.Max(Tolerance.GetValue(context), 1e-5f);
         var closeLoops = CloseLoops.GetValue(context);
+        var mergeDistance = MathF.Max(MergeDistance.GetValue(context), 0f);
+        var mergeSq = mergeDistance * mergeDistance;
 
         if (curves == null || curves.ContourCount == 0)
         {
@@ -36,7 +39,6 @@ internal sealed class CurvesToPoints : Instance<CurvesToPoints>
         curves.Attributes.TryGet<Vector4>(GeometryAttributeNames.Color, AttributeDomain.Contour, out var contourColors);
         var parts = curves.Parts;
 
-        _positions.Clear();
         _pointCount = 0;
         var partIndex = 0;
         for (var contourIndex = 0; contourIndex < curves.ContourCount; contourIndex++)
@@ -49,6 +51,22 @@ internal sealed class CurvesToPoints : Instance<CurvesToPoints>
             if (_positions.Count == 0)
                 continue;
 
+            // Collapse consecutive duplicates inside this contour.
+            if (mergeDistance > 0f)
+            {
+                var write = 0;
+                for (var read = 0; read < _positions.Count; read++)
+                {
+                    var candidate = _positions[read];
+                    if (write > 0 && Vector3.DistanceSquared(_positions[write - 1], candidate) <= mergeSq)
+                        continue;
+                    _positions[write++] = candidate;
+                }
+                if (write == 0)
+                    continue;
+                _positions.RemoveRange(write, _positions.Count - write);
+            }
+
             var color = Vector4.One;
             if (contourColors != null)
                 color = contourColors.Values[contourIndex];
@@ -57,20 +75,27 @@ internal sealed class CurvesToPoints : Instance<CurvesToPoints>
 
             var f2 = parts.Length > 0 ? partIndex : contourIndex;
             var closed = closeLoops && curves.ContourClosed[contourIndex];
-            var count = _positions.Count + (closed ? 1 : 0);
+            var closeCount = closed ? 1 : 0;
+
+            // Don't re-emit the seam point if the last point already lands on the first.
+            if (closed && mergeDistance > 0f && _positions.Count > 1 &&
+                Vector3.DistanceSquared(_positions[0], _positions[^1]) <= mergeSq)
+                closeCount = 0;
+
+            var count = _positions.Count + closeCount;
             EnsureCapacity(_pointCount + count + 1);
             for (var i = 0; i < count; i++)
             {
                 var position = _positions[i % _positions.Count];
                 _pointList.TypedElements[_pointCount++] = new Point
-                                                              {
-                                                                  Position = position,
-                                                                  F1 = 1,
-                                                                  F2 = f2,
-                                                                  Orientation = Quaternion.Identity,
-                                                                  Scale = Vector3.One,
-                                                                  Color = color,
-                                                              };
+                {
+                    Position = position,
+                    F1 = 1,
+                    F2 = f2,
+                    Orientation = Quaternion.Identity,
+                    Scale = Vector3.One,
+                    Color = color,
+                };
             }
 
             _pointList.TypedElements[_pointCount++] = Point.Separator();
@@ -100,4 +125,7 @@ internal sealed class CurvesToPoints : Instance<CurvesToPoints>
 
     [Input(Guid = "d2c8e5a3-1f64-4b97-8e3a-c5b0d7f4a916")]
     public readonly InputSlot<bool> CloseLoops = new();
+
+    [Input(Guid = "f8a3b1d7-6c95-4e02-9b4a-7d1e5c8f2a63")]
+    public readonly InputSlot<float> MergeDistance = new();
 }

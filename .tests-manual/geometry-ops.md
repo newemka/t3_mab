@@ -96,6 +96,24 @@ Feed the beveled cube into a `[VoronoiFracture]`, its `Points` from a
   `FillInterior` reproduces the old dark gaps (expected for that setting, which
   exists for open or non-manifold meshes).
 
+## Step: FillInterior and seam-split inputs
+
+**Action:**
+In the fracture chain from the step above, toggle `FillInterior` off and on again. Then replace
+the cube with a closed OBJ whose vertices are split at UV/normal seams (e.g.
+`Lib:meshes/camera-gizmo.obj`) and watch the console.
+
+**Expected:**
+- `FillInterior` on (default): cut faces that run through the solid's interior without touching
+  the surface are filled, and a seed cluster inside a big mesh yields fully interior chunks.
+- `FillInterior` off: those interior cut faces stay open (the documented dark gaps), and a cell
+  the surface never crosses produces no geometry at all. The setting decides this on its own -
+  it is never overridden by the input being closed.
+- The seam-split OBJ does not log "the input mesh is not a closed solid", and its chunks come out
+  closed (0 boundary edges in the output view).
+- A genuinely open mesh (`examples:meshes/low-poly-people/female-dancing.obj`) still logs the
+  warning with its open and non-manifold edge counts.
+
 ## Step: Fracturing a concave shape
 
 **Action:**

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Lib.Utils;
 using LibTessDotNet;
+using T3.Core.DataTypes.Geometry;
 using T3.Core.Utils;
 
 namespace Lib.geometry;
@@ -92,21 +93,22 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
 
     /// <summary>
     /// Cutting a cell out of a solid needs a closed surface to tell inside from outside.
-    /// Many scanned or sculpted meshes are open shells, and the fracture then produces
-    /// unclosed chunks that are hard to tell from a bug in this operator - so say it once
-    /// per input version instead. The answer also decides how far the chunks may be patched:
-    /// out of a closed solid every chunk must come out closed, so any gap left is this
-    /// operator's own doing and gets filled; out of an open shell a gap may be the input's,
-    /// and filling it would invent surface that was never there.
+    /// The answer also decides how far the chunks may be patched: out of a closed solid every
+    /// chunk must come out closed, so any gap left is this operator's own doing and gets filled;
+    /// out of an open shell a gap may be the input's, and filling it would invent surface that
+    /// was never there. The verdict is measured over welded positions, because imported meshes
+    /// are routinely geometrically closed while sharing no point indices (UV and normal seams
+    /// split vertices), and an index-based count would call those open shells - disabling the
+    /// repair and warning about holes that aren't there. Warned once per input version.
     /// </summary>
     private bool UpdateSourceStats(MeshGeometry source)
     {
-        var changed = _sourceStats.UpdateIfChanged(source);
-        var isClosed = _sourceStats.BoundaryEdges == 0 && _sourceStats.NonManifoldEdges == 0;
+        var changed = _sourceTopology.UpdateIfChanged(source);
+        var isClosed = _sourceTopology.BoundaryEdges == 0 && _sourceTopology.NonManifoldEdges == 0;
         if (changed && !isClosed)
         {
             Log.Warning($"VoronoiFracture: the input mesh is not a closed solid "
-                        + $"({_sourceStats.BoundaryEdges} open edges, {_sourceStats.NonManifoldEdges} non-manifold). "
+                        + $"({_sourceTopology.BoundaryEdges} open edges, {_sourceTopology.NonManifoldEdges} non-manifold). "
                         + "Chunks will have holes where the surface is missing.", this);
         }
 
@@ -131,8 +133,13 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
                      () => new CellBuilder(),
                      (seedIndex, _, builder) =>
                      {
-                         cells[seedIndex] = builder.BuildCell(sourceIndex, insideTester, seeds, seedIndex, sourceHasNormals, fillInterior,
-                                                             sourceIsClosed);
+                         // Named so the two flags can't be swapped again: fillInterior decides whether
+                         // cut-less faces are capped at all, sourceIsClosed whether a leftover gap is
+                         // this operator's own (and gets patched) or the input's (and stays open).
+                         cells[seedIndex] = builder.BuildCell(sourceIndex, insideTester, seeds, seedIndex,
+                                                             withNormals: sourceHasNormals,
+                                                             sourceIsClosed: sourceIsClosed,
+                                                             fillInterior: fillInterior);
                          var done = Interlocked.Increment(ref completed);
                          _asyncComputation.ReportProgress(done / (float)seeds.Length);
                          return builder;
@@ -313,9 +320,6 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
             }
 
             var surfaceCount = _polygons.Count;
-            if (_planeCapped.Length < _planes.Count)
-                _planeCapped = new bool[_planes.Count];
-            Array.Clear(_planeCapped, 0, _planes.Count);
 
             // All cuts first: where a cut ends on the edge two planes share, both planes must
             // subdivide that edge at the same point, or their caps meet in a T-junction.
@@ -355,7 +359,9 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
                 BuildCapsForPlane(planeNormal, planeOffset, planeIndex, hullFace, fillInterior, insideTester);
             }
 
-            CloseFacesBorderingCaps(surfaceCount);
+            // A plane the surface does not cross is capped by its own inside probe further down;
+            // there is no separate pass that closes a leftover face from its neighbours, because a
+            // cell face is not the same shape as the solid's cross section on a concave body.
             _polygonPool.ReturnAll(_hull);
 
             // Emit with per-cell point dedup so each chunk is watertight
@@ -370,7 +376,7 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
             EmitPolygons(_kept, withNormals);
             EmitPolygons(_polygons, withNormals);
             RemoveDuplicateFaces();
-            FillCapHoles(withNormals, sourceIsClosed);
+            FillCapHoles(withNormals, sourceIsClosed, fillInterior);
 
             return new CellResult(_positions.ToArray(), _corners.ToArray(), _normals.ToArray(), _faceOffsets.ToArray(), _isCap.ToArray());
         }
@@ -505,9 +511,8 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
         }
 
         /// <summary>
-        /// Two caps on one plane can end up with the same corners (a chain that failed to
-        /// link and walked the hull on its own). A second face over the same corners is never
-        /// legitimate in a cell, so it is dropped here.
+        /// Two faces over the same corners are never legitimate in a cell - the second one would
+        /// make the chunk non-manifold - so it is dropped here.
         /// </summary>
         private void RemoveDuplicateFaces()
         {
@@ -572,7 +577,7 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
         /// are the real boundary of an open input mesh and stay open - unless every edge is
         /// tiny, which is a degenerate corner at the surface, not a mesh border.
         /// </summary>
-        private void FillCapHoles(bool withNormals, bool sourceIsClosed)
+        private void FillCapHoles(bool withNormals, bool sourceIsClosed, bool fillInterior)
         {
             var faceCount = _faceOffsets.Count - 1;
             _edgeUse.Clear();
@@ -589,9 +594,11 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
                 }
             }
 
-            // Directed: the hole runs opposite to the face edge, so it inherits a consistent winding
+            // Directed: the hole runs opposite to the face edge, so it inherits a consistent winding.
+            // Keyed by the directed edge and consumed once, not by its start vertex: several loops
+            // can meet in one vertex, and keying by vertex used to swallow the second one entirely.
             _holeEdges.Clear();
-            _surfaceHoleEdges.Clear();
+            _holeOutgoing.Clear();
             for (var f = 0; f < faceCount; f++)
             {
                 var start = _faceOffsets[f];
@@ -604,85 +611,117 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
                     if (_edgeUse[key] != 1)
                         continue;
 
-                    _holeEdges[b] = a;
-                    if (!_isCap[f])
-                        _surfaceHoleEdges.Add(b);
+                    _holeEdges[(b, a)] = !_isCap[f];
+                    if (!_holeOutgoing.TryGetValue(b, out var outgoing))
+                    {
+                        outgoing = [];
+                        _holeOutgoing[b] = outgoing;
+                    }
+
+                    outgoing.Add(a);
                 }
             }
 
             if (_holeEdges.Count == 0)
                 return;
 
-            _holeUsed.Clear();
-            foreach (var loopStart in _holeEdges.Keys)
+            _holeUsedEdges.Clear();
+            foreach (var (loopStart, outgoing) in _holeOutgoing)
             {
-                if (_holeUsed.Contains(loopStart))
-                    continue;
-
-                _holeLoop.Clear();
-                var current = loopStart;
-                var closed = false;
-                for (var guard = 0; guard <= _holeEdges.Count; guard++)
+                // Every outgoing edge at a vertex is a candidate start, so loops touching in one
+                // vertex are each walked instead of only the first.
+                for (var seedIndex = 0; seedIndex < outgoing.Count; seedIndex++)
                 {
-                    _holeLoop.Add(current);
-                    _holeUsed.Add(current);
-                    if (!_holeEdges.TryGetValue(current, out var next))
-                        break; // continues on a surface edge: not a cap hole
+                    if (_holeUsedEdges.Contains((loopStart, outgoing[seedIndex])))
+                        continue;
 
-                    if (next == loopStart)
+                    _holeLoop.Clear();
+                    var current = loopStart;
+                    var closed = false;
+                    for (var guard = 0; guard <= _holeEdges.Count; guard++)
                     {
-                        closed = true;
-                        break;
+                        _holeLoop.Add(current);
+                        if (!TryTakeHoleEdge(current, out var next))
+                            break; // continues on a surface edge: not a cap hole
+
+                        if (next == loopStart)
+                        {
+                            closed = true;
+                            break;
+                        }
+
+                        current = next;
                     }
 
-                    if (_holeUsed.Contains(next))
-                        break;
+                    if (!closed || _holeLoop.Count < 3)
+                        continue;
 
-                    current = next;
+                    var usesSurfaceEdge = false;
+                    var isTiny = true;
+                    var tinyLimitSq = _weldEpsilonSq * 64;
+                    for (var i = 0; i < _holeLoop.Count; i++)
+                    {
+                        var from = _holeLoop[i];
+                        var to = _holeLoop[(i + 1) % _holeLoop.Count];
+                        usesSurfaceEdge |= _holeEdges[(from, to)];
+                        var p0 = _positions[from];
+                        var p1 = _positions[to];
+                        isTiny &= Vector3.DistanceSquared(p0, p1) < tinyLimitSq;
+                    }
+
+                    // A loop of cap edges only is a face no surface crosses - that is FillInterior's
+                    // business, and patching it here would keep filling interiors the user turned off.
+                    if (!usesSurfaceEdge && !isTiny && !fillInterior)
+                        continue;
+
+                    // A loop running along surface edges is normally left alone: it may be a hole the
+                    // input already had, and a flat patch there would invent surface. Out of a closed
+                    // solid there is no such hole, so the gap is ours to close.
+                    if (usesSurfaceEdge && !isTiny && !sourceIsClosed)
+                        continue;
+
+                    var normal = Vector3.Zero;
+                    for (var i = 0; i < _holeLoop.Count; i++)
+                    {
+                        var p0 = _positions[_holeLoop[i]];
+                        var p1 = _positions[_holeLoop[(i + 1) % _holeLoop.Count]];
+                        normal += new Vector3((p0.Y - p1.Y) * (p0.Z + p1.Z),
+                                              (p0.Z - p1.Z) * (p0.X + p1.X),
+                                              (p0.X - p1.X) * (p0.Y + p1.Y));
+                    }
+
+                    if (normal.LengthSquared() > 1e-20f)
+                        normal = Vector3.Normalize(normal);
+
+                    foreach (var pointId in _holeLoop)
+                    {
+                        _corners.Add(pointId);
+                        _normals.Add(withNormals ? normal : Vector3.Zero);
+                    }
+
+                    _faceOffsets.Add(_corners.Count);
+                    _isCap.Add(true);
                 }
-
-                if (!closed || _holeLoop.Count < 3)
-                    continue;
-
-                var usesSurfaceEdge = false;
-                var isTiny = true;
-                var tinyLimitSq = _weldEpsilonSq * 64;
-                for (var i = 0; i < _holeLoop.Count; i++)
-                {
-                    usesSurfaceEdge |= _surfaceHoleEdges.Contains(_holeLoop[i]);
-                    var p0 = _positions[_holeLoop[i]];
-                    var p1 = _positions[_holeLoop[(i + 1) % _holeLoop.Count]];
-                    isTiny &= Vector3.DistanceSquared(p0, p1) < tinyLimitSq;
-                }
-
-                // A loop running along surface edges is normally left alone: it may be a hole the
-                // input already had, and a flat patch there would invent surface. Out of a closed
-                // solid there is no such hole, so the gap is ours to close.
-                if (usesSurfaceEdge && !isTiny && !sourceIsClosed)
-                    continue;
-
-                var normal = Vector3.Zero;
-                for (var i = 0; i < _holeLoop.Count; i++)
-                {
-                    var p0 = _positions[_holeLoop[i]];
-                    var p1 = _positions[_holeLoop[(i + 1) % _holeLoop.Count]];
-                    normal += new Vector3((p0.Y - p1.Y) * (p0.Z + p1.Z),
-                                          (p0.Z - p1.Z) * (p0.X + p1.X),
-                                          (p0.X - p1.X) * (p0.Y + p1.Y));
-                }
-
-                if (normal.LengthSquared() > 1e-20f)
-                    normal = Vector3.Normalize(normal);
-
-                foreach (var pointId in _holeLoop)
-                {
-                    _corners.Add(pointId);
-                    _normals.Add(withNormals ? normal : Vector3.Zero);
-                }
-
-                _faceOffsets.Add(_corners.Count);
-                _isCap.Add(true);
             }
+        }
+
+        /// <summary>Takes one unused outgoing hole edge from a vertex; false when the chain ends there.</summary>
+        private bool TryTakeHoleEdge(int from, out int to)
+        {
+            to = -1;
+            if (!_holeOutgoing.TryGetValue(from, out var outgoing))
+                return false;
+
+            foreach (var candidate in outgoing)
+            {
+                if (!_holeUsedEdges.Add((from, candidate)))
+                    continue;
+
+                to = candidate;
+                return true;
+            }
+
+            return false;
         }
 
         private void ComputeBounds(out Vector3 min, out Vector3 max)
@@ -1113,7 +1152,6 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
             cap.Vertices.Add(new Vertex(p1, planeNormal));
             cap.Vertices.Add(new Vertex(p2, planeNormal));
             _polygons.Add(cap);
-            _planeCapped[planeIndex] = true;
         }
 
         /// <summary>
@@ -1190,7 +1228,6 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
             }
 
             _polygons.Add(cap);
-            _planeCapped[planeIndex] = true;
             return true;
         }
 
@@ -1380,60 +1417,6 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
         private static Vec3 ToVec3(Vector3 p) => new(p.X, p.Y, p.Z);
         private static Vector3 ToVector3(Vec3 p) => new(p.X, p.Y, p.Z);
 
-        /// <summary>
-        /// A cell face without any surface cut is solid if it borders a cap: its hull edges
-        /// are then edges of neighbouring caps. Closing those faces needs no inside test
-        /// and is order-independent; it repeats until nothing changes, so a run of cut-less
-        /// faces is closed from the first one that borders a cap.
-        /// </summary>
-        private void CloseFacesBorderingCaps(int surfaceCount)
-        {
-            var added = true;
-            while (added)
-            {
-                added = false;
-                foreach (var hullFace in _hull)
-                {
-                    var planeIndex = hullFace.PlaneIndex;
-                    if (planeIndex < 0 || _planeCapped[planeIndex] || hullFace.Vertices.Count < 3)
-                        continue;
-
-                    if (!SharesEdgeWithCap(hullFace, surfaceCount))
-                        continue;
-
-                    var cap = _polygonPool.Rent(hullFace);
-                    cap.IsCap = true;
-                    _polygons.Add(cap);
-                    _planeCapped[planeIndex] = true;
-                    added = true;
-                }
-            }
-        }
-
-        private bool SharesEdgeWithCap(Polygon hullFace, int surfaceCount)
-        {
-            var vertices = hullFace.Vertices;
-            for (var i = 0; i < vertices.Count; i++)
-            {
-                var a = vertices[i].Position;
-                var b = vertices[(i + 1) % vertices.Count].Position;
-                for (var polygonIndex = surfaceCount; polygonIndex < _polygons.Count; polygonIndex++)
-                {
-                    var capVertices = _polygons[polygonIndex].Vertices;
-                    for (var j = 0; j < capVertices.Count; j++)
-                    {
-                        var c = capVertices[j].Position;
-                        var d = capVertices[(j + 1) % capVertices.Count].Position;
-                        if ((Vector3.DistanceSquared(a, c) < _weldEpsilonSq && Vector3.DistanceSquared(b, d) < _weldEpsilonSq)
-                            || (Vector3.DistanceSquared(a, d) < _weldEpsilonSq && Vector3.DistanceSquared(b, c) < _weldEpsilonSq))
-                            return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
         private static Vector3 NewellNormal(List<Vector3> loop)
         {
             var normal = Vector3.Zero;
@@ -1505,7 +1488,6 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
                     (int)MathF.Floor(position.Z * _weldGridScale));
         }
 
-        private bool[] _planeCapped = [];
         private float _weldEpsilon;
         private float _planeEpsilon;
         private float _onPlaneEpsilon;
@@ -1540,9 +1522,9 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
         private readonly Dictionary<(int, int), int> _edgeUse = [];
         private readonly HashSet<long> _faceKeys = [];
         private readonly List<bool> _keepFace = [];
-        private readonly Dictionary<int, int> _holeEdges = [];
-        private readonly HashSet<int> _surfaceHoleEdges = [];
-        private readonly HashSet<int> _holeUsed = [];
+        private readonly Dictionary<(int From, int To), bool> _holeEdges = []; // value: the boundary edge belongs to a surface face
+        private readonly Dictionary<int, List<int>> _holeOutgoing = [];
+        private readonly HashSet<(int, int)> _holeUsedEdges = [];
         private readonly List<int> _holeLoop = [];
         private readonly List<int> _nextInBucket = [];
         private int[] _order = [];
@@ -1774,6 +1756,128 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
         private readonly int[] _gridEntries;
     }
 
+    /// <summary>
+    /// Open and non-manifold edge counts over positions welded by distance, cached per input
+    /// version. Two positions closer than <see cref="ClosednessWeldFactor"/> of the mesh extent
+    /// are one vertex - that is float noise and per-face vertex splits, not geometry - while the
+    /// tolerance stays far below the cut weld so a real crack is still reported as open.
+    /// </summary>
+    private sealed class WeldedTopology
+    {
+        public int BoundaryEdges { get; private set; }
+        public int NonManifoldEdges { get; private set; }
+
+        public bool UpdateIfChanged(MeshGeometry geometry)
+        {
+            if (ReferenceEquals(geometry, _lastGeometry) && geometry.Version == _lastVersion)
+                return false;
+
+            Measure(geometry);
+            _lastGeometry = geometry;
+            _lastVersion = geometry.Version;
+            return true;
+        }
+
+        private void Measure(MeshGeometry geometry)
+        {
+            BoundaryEdges = 0;
+            NonManifoldEdges = 0;
+            var positions = geometry.Positions;
+            if (positions.Length == 0 || geometry.FaceCount == 0)
+                return;
+
+            var min = new Vector3(float.MaxValue);
+            var max = new Vector3(float.MinValue);
+            foreach (var position in positions)
+            {
+                min = Vector3.Min(min, position);
+                max = Vector3.Max(max, position);
+            }
+
+            var extent = MathF.Max(max.X - min.X, MathF.Max(max.Y - min.Y, max.Z - min.Z));
+            var tolerance = extent * ClosednessWeldFactor;
+            var toleranceSq = tolerance * tolerance;
+            var gridScale = tolerance > 0 ? 1f / tolerance : 0f;
+
+            // Weld points: the bucket size equals the tolerance, so the 27 neighbouring buckets
+            // cover the whole radius and a bucket chains its points through _nextInBucket.
+            _weldedPositions.Clear();
+            _bucketHeads.Clear();
+            _nextInBucket.Clear();
+            var weldedIds = new int[positions.Length];
+            for (var i = 0; i < positions.Length; i++)
+            {
+                var position = positions[i];
+                var (kx, ky, kz) = ((int)MathF.Floor(position.X * gridScale),
+                                    (int)MathF.Floor(position.Y * gridScale),
+                                    (int)MathF.Floor(position.Z * gridScale));
+                var found = -1;
+                for (var dz = -1; dz <= 1 && found < 0; dz++)
+                for (var dy = -1; dy <= 1 && found < 0; dy++)
+                for (var dx = -1; dx <= 1 && found < 0; dx++)
+                {
+                    if (!_bucketHeads.TryGetValue((kx + dx, ky + dy, kz + dz), out var candidate))
+                        continue;
+
+                    while (candidate >= 0)
+                    {
+                        if (Vector3.DistanceSquared(_weldedPositions[candidate], position) < toleranceSq)
+                        {
+                            found = candidate;
+                            break;
+                        }
+
+                        candidate = _nextInBucket[candidate];
+                    }
+                }
+
+                if (found < 0)
+                {
+                    found = _weldedPositions.Count;
+                    _weldedPositions.Add(position);
+                    _nextInBucket.Add(_bucketHeads.TryGetValue((kx, ky, kz), out var head) ? head : -1);
+                    _bucketHeads[(kx, ky, kz)] = found;
+                }
+
+                weldedIds[i] = found;
+            }
+
+            _edgeUse.Clear();
+            var offsets = geometry.FaceCornerOffsets;
+            var corners = geometry.CornerPointIndices;
+            for (var faceIndex = 0; faceIndex < geometry.FaceCount; faceIndex++)
+            {
+                var start = offsets[faceIndex];
+                var end = offsets[faceIndex + 1];
+                for (var c = start; c < end; c++)
+                {
+                    var a = weldedIds[corners[c]];
+                    var b = weldedIds[corners[c + 1 == end ? start : c + 1]];
+                    if (a == b)
+                        continue; // welding collapsed this edge; it is not an open edge
+
+                    var key = a < b ? (a, b) : (b, a);
+                    _edgeUse[key] = _edgeUse.GetValueOrDefault(key) + 1;
+                }
+            }
+
+            foreach (var use in _edgeUse.Values)
+            {
+                if (use == 1)
+                    BoundaryEdges++;
+                else if (use > 2)
+                    NonManifoldEdges++;
+            }
+        }
+
+        private MeshGeometry _lastGeometry;
+        private int _lastVersion;
+        private readonly List<Vector3> _weldedPositions = [];
+        private readonly List<int> _nextInBucket = [];
+        private readonly Dictionary<(int, int, int), int> _bucketHeads = [];
+        private readonly Dictionary<(int, int), int> _edgeUse = [];
+    }
+
     /// <summary>Recycles polygon objects across cells - cloning the whole mesh per cell otherwise dominates GC.</summary>
     private sealed class PolygonPool
     {
@@ -1832,6 +1936,7 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
     private const float ClipToleranceFactor = 1e-6f; // of the mesh extent; below this a vertex counts as lying in the plane
     private const float OnPlaneToleranceFactor = 1e-5f; // of the mesh extent; edges within this are cut boundaries
     private const float WeldToleranceFactor = 1e-3f; // of the mesh extent; slivers below that merge
+    private const float ClosednessWeldFactor = 1e-5f; // of the mesh extent; merges split corners without hiding a real crack
     private const float DegenerateEpsilonSq = 1e-7f * 1e-7f;
 
     public bool TryGetProgress(out float progress) => _asyncComputation.TryGetUiProgress(out progress);
@@ -1839,7 +1944,7 @@ internal sealed class VoronoiFracture : Instance<VoronoiFracture>, IProgressProv
     private readonly MeshGeometry _output = new();
     private readonly AsyncComputation<MeshGeometry> _asyncComputation = new();
     private readonly List<Vector3> _seeds = [];
-    private readonly MeshGeometryStats _sourceStats = new();
+    private readonly WeldedTopology _sourceTopology = new();
 
     [Input(Guid = "31c7e9d4-85f2-4a60-b1c8-6d0a5e3f9b27")]
     public readonly InputSlot<MeshGeometry> Geometry = new();

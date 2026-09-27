@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Lib.Utils;
+using T3.Core.DataTypes.Geometry;
 using T3.Core.Utils;
 
 namespace Lib.geometry;

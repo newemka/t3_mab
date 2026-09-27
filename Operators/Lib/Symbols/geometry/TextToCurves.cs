@@ -1,6 +1,8 @@
 #nullable enable
 using SixLabors.Fonts;
 using SixLabors.Fonts.Unicode;
+using T3.Core.DataTypes.Geometry;
+
 #if SIXLABORS_FONTS_V3
 using SixLabors.Fonts.Rendering;
 #endif

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using LibTessDotNet;
+using T3.Core.DataTypes.Geometry;
 
 namespace Lib.geometry;
 

@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace T3.Core.DataTypes;
+namespace T3.Core.DataTypes.Geometry;
 
 /// <summary>
 /// The element domain an attribute's values are attached to. Mesh domains first;
@@ -25,6 +25,8 @@ public enum AttributeDomain
 public static class GeometryAttributeNames
 {
     public const string Normal = "Normal";
+    /// <summary>Corner domain, Vector4: xyz = tangent, w = bitangent sign (handedness).</summary>
+    public const string Tangent = "Tangent";
     public const string TexCoord = "TexCoord";
     public const string TexCoord2 = "TexCoord2";
     public const string Color = "Color";

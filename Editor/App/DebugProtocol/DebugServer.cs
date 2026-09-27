@@ -30,6 +30,7 @@ using T3.Editor.UiModel;
 using T3.Editor.UiModel.Commands;
 using T3.Editor.UiModel.Commands.Graph;
 using T3.Editor.UiModel.ProjectHandling;
+using T3.Core.DataTypes.Geometry;
 
 namespace T3.Editor.App.DebugProtocol;
 
@@ -1424,7 +1425,7 @@ internal static class DebugServer
 
         var edgeUse = new Dictionary<(int, int), int>();
         var edgeOnCut = new Dictionary<(int, int), bool>();
-        geometry.Attributes.TryGet<float>(T3.Core.DataTypes.GeometryAttributeNames.IsCut, T3.Core.DataTypes.AttributeDomain.Face, out var isCut);
+        geometry.Attributes.TryGet<float>(GeometryAttributeNames.IsCut, AttributeDomain.Face, out var isCut);
         var volume = 0.0;
         for (var faceIndex = 0; faceIndex < geometry.FaceCount; faceIndex++)
         {
@@ -1508,7 +1509,7 @@ internal static class DebugServer
         var positions = geometry.Positions;
         var offsets = geometry.FaceCornerOffsets;
         var corners = geometry.CornerPointIndices;
-        geometry.Attributes.TryGet<float>(T3.Core.DataTypes.GeometryAttributeNames.IsCut, T3.Core.DataTypes.AttributeDomain.Face, out var isCut);
+        geometry.Attributes.TryGet<float>(GeometryAttributeNames.IsCut, AttributeDomain.Face, out var isCut);
 
         var sb = new StringBuilder();
         var culture = System.Globalization.CultureInfo.InvariantCulture;

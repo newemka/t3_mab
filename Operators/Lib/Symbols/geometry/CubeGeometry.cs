@@ -1,3 +1,5 @@
+using T3.Core.DataTypes.Geometry;
+
 namespace Lib.geometry;
 
 [Guid("85c19291-2bc1-4271-88f9-f1b50696da1b")]

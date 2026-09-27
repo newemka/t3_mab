@@ -1,5 +1,6 @@
 #nullable enable
 using T3.Core.DataTypes;
+using T3.Core.DataTypes.Geometry;
 using T3.Core.Output;
 
 namespace Lib.render.output;
