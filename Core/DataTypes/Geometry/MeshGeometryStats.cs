@@ -61,7 +61,7 @@ public sealed class MeshGeometryStats
         if (positions.Length == 0)
             min = max = Vector3.Zero;
 
-        MeasureFaces(geometry, 0, geometry.FaceCount, out var volume, out var boundaryEdges, out var nonManifoldEdges);
+        MeasureFaces(geometry, 0, geometry.FaceCount, (min + max) * 0.5f, out var volume, out var boundaryEdges, out var nonManifoldEdges);
 
         var sourceParts = geometry.Parts;
         if (Parts.Length != sourceParts.Length)
@@ -71,7 +71,7 @@ public sealed class MeshGeometryStats
         {
             var part = sourceParts[partIndex];
             var faceEnd = Math.Min(part.FaceStart + part.FaceCount, geometry.FaceCount);
-            MeasureFaces(geometry, part.FaceStart, faceEnd, out var partVolume, out var partBoundary, out _);
+            MeasureFaces(geometry, part.FaceStart, faceEnd, (min + max) * 0.5f, out var partVolume, out var partBoundary, out _);
             Parts[partIndex] = new PartStats(faceEnd - part.FaceStart, partBoundary, partVolume, part.Pivot, part.SeedIndex);
         }
 
@@ -86,7 +86,8 @@ public sealed class MeshGeometryStats
         NonManifoldEdges = nonManifoldEdges;
     }
 
-    private void MeasureFaces(MeshGeometry geometry, int faceStart, int faceEnd, out float volume, out int boundaryEdges, out int nonManifoldEdges)
+    private void MeasureFaces(MeshGeometry geometry, int faceStart, int faceEnd, Vector3 reference,
+                              out float volume, out int boundaryEdges, out int nonManifoldEdges)
     {
         var positions = geometry.Positions;
         var offsets = geometry.FaceCornerOffsets;
@@ -107,10 +108,15 @@ public sealed class MeshGeometryStats
                 _edgeUse[key] = _edgeUse.GetValueOrDefault(key) + 1;
             }
 
-            var p0 = positions[corners[start]];
+            // The tetrahedra are summed from an interior reference rather than from the origin: the
+            // individual terms grow with the distance to the origin and cancel back down, so a mesh far
+            // away loses the whole result to float cancellation. Any fixed reference gives the same
+            // volume for a closed surface, and the bounds centre keeps the terms small.
+            var p0 = positions[corners[start]] - reference;
             for (var c = start + 2; c < end; c++)
             {
-                volumeSum += Vector3.Dot(p0, Vector3.Cross(positions[corners[c - 1]], positions[corners[c]])) / 6.0;
+                volumeSum += Vector3.Dot(p0, Vector3.Cross(positions[corners[c - 1]] - reference,
+                                                            positions[corners[c]] - reference)) / 6.0;
             }
         }
 
