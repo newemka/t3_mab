@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 using System.Numerics;
-using T3.Core.DataTypes;
+using T3.Core.DataTypes.Geometry;
 using T3.Core.Rendering;
 using T3.Core.Utils.Geometry;
 
@@ -25,6 +25,7 @@ internal sealed class GeometryMeshCompiler
     private readonly record struct VertexKey(
     int Point,
     int Nx, int Ny, int Nz,
+    int Tx, int Ty, int Tz, int Tw,
     int U, int V,
     int R, int G, int B, int A);
 
@@ -32,11 +33,12 @@ internal sealed class GeometryMeshCompiler
     private PbrVertex[] _vertexScratch = [];
 
     private static int Quantize(float v) => (int)MathF.Round(v * 1e5f);
-    private static VertexKey MakeKey(int point, Vector3 n, Vector2 uv, Vector4 c) =>
-        new(point,
-            Quantize(n.X), Quantize(n.Y), Quantize(n.Z),
-            Quantize(uv.X), Quantize(uv.Y),
-            Quantize(c.X), Quantize(c.Y), Quantize(c.Z), Quantize(c.W));
+    private static VertexKey MakeKey(int point, Vector3 n, Vector4 t, Vector2 uv, Vector4 c) =>
+    new(point,
+        Quantize(n.X), Quantize(n.Y), Quantize(n.Z),
+        Quantize(t.X), Quantize(t.Y), Quantize(t.Z), Quantize(t.W),
+        Quantize(uv.X), Quantize(uv.Y),
+        Quantize(c.X), Quantize(c.Y), Quantize(c.Z), Quantize(c.W));
 
     /// <summary>
     /// Compiles <paramref name="geometry"/>. With <paramref name="relativeToPartPivots"/> the vertex
@@ -54,8 +56,8 @@ internal sealed class GeometryMeshCompiler
 
         // Attribute lookups once, outside the loops
         geometry.Attributes.TryGet<Vector3>(GeometryAttributeNames.Normal, AttributeDomain.Corner, out var cornerNormals);
+        geometry.Attributes.TryGet<Vector4>(GeometryAttributeNames.Tangent, AttributeDomain.Corner, out var cornerTangents);
         geometry.Attributes.TryGet<Vector2>(GeometryAttributeNames.TexCoord, AttributeDomain.Corner, out var cornerUvs);
-        geometry.Attributes.TryGet<Vector2>(GeometryAttributeNames.TexCoord2, AttributeDomain.Corner, out var cornerUvs2);
         geometry.Attributes.TryGet<Vector4>(GeometryAttributeNames.Color, AttributeDomain.Corner, out var cornerColors);
 
         // Coarser color domains are promoted to corners here: face color, else part color
@@ -76,7 +78,6 @@ internal sealed class GeometryMeshCompiler
         var parts = geometry.Parts;
         var partCount = parts.Length > 0 ? parts.Length : 1;
 
-       // var triangleCount = geometry.GetTriangleCount();
         if (Triangles.Length != triangleCount)
             Triangles = new Int3[triangleCount];
         if (_vertexScratch.Length < geometry.CornerCount)
@@ -136,18 +137,26 @@ internal sealed class GeometryMeshCompiler
                 else if (partColors != null)
                     faceColor = _faceToPart[faceIndex] >= 0 ? partColors.Values[_faceToPart[faceIndex]] : Vector4.One;
 
-                // Per-face TBN (unchanged; still from the first triangle, still overwritten later by RecomputeNormals)
-                var c0 = start;
-                var c1 = start + 1;
-                var c2 = start + 2;
-                MeshUtils.CalcTBNSpace(positions[cornerPoints[c0]], cornerUvs?.Values[c0] ?? Vector2.Zero,
-                                       positions[cornerPoints[c1]], cornerUvs?.Values[c1] ?? Vector2.UnitX,
-                                       positions[cornerPoints[c2]], cornerUvs?.Values[c2] ?? Vector2.One,
-                                       faceNormal, out var tangent, out var bitangent);
-                if (tangent.LengthSquared() < 1e-10f || float.IsNaN(tangent.X))
+                // Face-level TBN fallback from the first triangle. Only used when the geometry
+                // carries no per-corner Tangent attribute (e.g. geometry not produced by
+                // CurvesToGeometry, or with UVs it can actually derive a frame from).
+                var faceTangent = Vector3.Zero;
+                var faceBitangent = Vector3.Zero;
+                var needFaceTbn = cornerTangents == null;
+                if (needFaceTbn)
                 {
-                    tangent = Vector3.Normalize(Vector3.Cross(faceNormal, Math.Abs(faceNormal.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX));
-                    bitangent = Vector3.Cross(faceNormal, tangent);
+                    var c0 = start;
+                    var c1 = start + 1;
+                    var c2 = start + 2;
+                    MeshUtils.CalcTBNSpace(positions[cornerPoints[c0]], cornerUvs?.Values[c0] ?? Vector2.Zero,
+                                           positions[cornerPoints[c1]], cornerUvs?.Values[c1] ?? Vector2.UnitX,
+                                           positions[cornerPoints[c2]], cornerUvs?.Values[c2] ?? Vector2.One,
+                                           faceNormal, out faceTangent, out faceBitangent);
+                    if (faceTangent.LengthSquared() < 1e-10f || float.IsNaN(faceTangent.X))
+                    {
+                        faceTangent = Vector3.Normalize(Vector3.Cross(faceNormal, Math.Abs(faceNormal.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX));
+                        faceBitangent = Vector3.Cross(faceNormal, faceTangent);
+                    }
                 }
 
                 if (localIndices.Length < faceCornerCount)
@@ -161,7 +170,34 @@ internal sealed class GeometryMeshCompiler
                     var color = cornerColors != null ? cornerColors.Values[c] : faceColor;
                     var pointIndex = cornerPoints[c];
 
-                    var key = MakeKey(pointIndex, normal, uv, color);
+                    // Resolve this corner's tangent frame.
+                    Vector3 tangent;
+                    Vector3 bitangent;
+                    Vector4 tangent4;
+                    if (cornerTangents != null)
+                    {
+                        var t4 = cornerTangents.Values[c];
+                        tangent = new Vector3(t4.X, t4.Y, t4.Z);
+
+                        // Re-orthogonalize against the corner normal so the tangent stays in-plane,
+                        // even if the authored tangent and the (possibly smoothed) normal drifted apart.
+                        tangent = Vector3.Normalize(tangent - normal * Vector3.Dot(normal, tangent));
+                        if (float.IsNaN(tangent.X) || tangent.LengthSquared() < 1e-10f)
+                            tangent = Vector3.Normalize(Vector3.Cross(normal, Math.Abs(normal.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX));
+
+                        bitangent = Vector3.Cross(normal, tangent) * t4.W;
+                        tangent4 = new Vector4(tangent, t4.W);
+                    }
+                    else
+                    {
+                        tangent = faceTangent;
+                        bitangent = faceBitangent;
+                        // Recover a sign relative to the corner normal so the key is stable per corner.
+                        var sign = Vector3.Dot(Vector3.Cross(normal, tangent), bitangent) < 0 ? -1f : 1f;
+                        tangent4 = new Vector4(tangent, sign);
+                    }
+
+                    var key = MakeKey(pointIndex, normal, tangent4, uv, color);
                     if (_weldLookup.TryGetValue(key, out var existing))
                     {
                         localIndices[i] = existing;
@@ -222,12 +258,12 @@ internal sealed class GeometryMeshCompiler
                 Chunks = new MeshChunkDef[1];
 
             Chunks[0] = new MeshChunkDef
-                            {
-                                StartFaceIndex = 0,
-                                FaceCount = Triangles.Length,
-                                StartVertexIndex = 0,
-                                VertexCount = vertices.Length,
-                            };
+            {
+                StartFaceIndex = 0,
+                FaceCount = Triangles.Length,
+                StartVertexIndex = 0,
+                VertexCount = vertices.Length,
+            };
             return;
         }
 
@@ -260,12 +296,12 @@ internal sealed class GeometryMeshCompiler
             }
 
             Chunks[partIndex] = new MeshChunkDef
-                                    {
-                                        StartFaceIndex = triangleStart,
-                                        FaceCount = triangleCount,
-                                        StartVertexIndex = cornerStart,
-                                        VertexCount = cornerEnd - cornerStart,
-                                    };
+            {
+                StartFaceIndex = triangleStart,
+                FaceCount = triangleCount,
+                StartVertexIndex = cornerStart,
+                VertexCount = cornerEnd - cornerStart,
+            };
             triangleStart += triangleCount;
         }
     }
