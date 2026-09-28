@@ -65,7 +65,8 @@ internal static class PolygonLoader
                 if (attributes.Length > 0)
                     schema.ReadCorner(resolved, c, attributes);
 
-                vertices.Add(new Vert(position, weld.GetOrAddPoint(position)) { Attributes = attributes });
+                var id = weld.GetOrAddPoint(position);
+                vertices.Add(new Vert(weld.Positions[id], id) { Attributes = attributes });
             }
 
             if (!TryPlaneOf(vertices, out var plane))

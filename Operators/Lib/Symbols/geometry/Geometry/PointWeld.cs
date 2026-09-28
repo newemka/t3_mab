@@ -37,6 +37,9 @@ internal sealed class PointWeld
     /// <summary>Merge radius; also the slack callers use when asking whether a point lies on an edge.</summary>
     public float Tolerance => _tolerance;
 
+    /// <summary>The merge radius squared, for callers testing many candidates against it.</summary>
+    public float ToleranceSq => _toleranceSq;
+
     /// <summary>Every distinct position, indexed by the id returned from <see cref="GetOrAddPoint"/>.</summary>
     public List<Vector3> Positions { get; } = [];
 

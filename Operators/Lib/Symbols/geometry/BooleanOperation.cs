@@ -111,12 +111,24 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
             var capturedOperation = _operation;
             var capturedSplit = _splitIntoParts;
             var capturedSplitOperands = _splitOperands;
+
+            // A budget abort is an answer, not a failure: Evaluate catches it and returns an empty
+            // target. Letting it escape would fault the task, which the async machinery reports as a
+            // generic error and stops retrying on.
             var result = _asyncComputation.Update(context, Result, hash.ToHashCode(),
                                                   token =>
                                                   {
                                                       var target = new MeshGeometry();
-                                                      Evaluate(capturedLeft, capturedRights, capturedOperation, capturedSplit, target,
-                                                               capturedSplitOperands, token);
+                                                      try
+                                                      {
+                                                          Evaluate(capturedLeft, capturedRights, capturedOperation, capturedSplit, target,
+                                                                   capturedSplitOperands, token);
+                                                      }
+                                                      catch (FragmentBudgetExceededException e)
+                                                      {
+                                                          Log.Warning(e.Message);
+                                                      }
+
                                                       return target;
                                                   });
             Result.Value = result ?? _output;
@@ -229,8 +241,21 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var folded = FoldOperands(new Branch(leftParts[p].Polygons, leftParts[p].Seed), rightOperands, kernel, operation,
+            List<Branch>? folded;
+            try
+            {
+                folded = FoldOperands(new Branch(leftParts[p].Polygons, leftParts[p].Seed), rightOperands, kernel, operation,
                                       cancellationToken);
+            }
+            catch (FragmentBudgetExceededException e)
+            {
+                // The combine that tripped this has already abandoned its fragments; everything built
+                // before it goes too, because a result missing one part's contribution is not an answer.
+                Log.Warning(e.Message);
+                budgetExceeded = true;
+                break;
+            }
+
             if (folded == null)
             {
                 budgetExceeded = true;
@@ -295,7 +320,8 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         // and a shared face between two touching parts cannot look non-manifold to it.
         var stats = new MeshGeometryStats();
         stats.Measure(target);
-        WarnIfOpen(stats.BoundaryEdges, stats.NonManifoldEdges);
+        var (droppedCorners, droppedFaces) = kernel.DroppedAtEmit;
+        WarnIfOpen(stats.BoundaryEdges, stats.NonManifoldEdges, droppedCorners, droppedFaces);
     }
 
     /// <summary>Face range and seed of one operand part; a mesh without a part table is one whole solid.</summary>
@@ -339,7 +365,20 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                 for (var b = 0; b < generation.Count; b++)
                 {
                     var branch = generation[b];
-                    branch.Polygons = kernel.Combine(ClonePolygons(branch.Polygons), ClonePolygons(solid), operation);
+                    branch.Polygons = kernel.Combine(ClonePolygons(branch.Polygons), ClonePolygons(solid), operation, i + 1);
+
+                    var livec = 0;
+                    for (var polygon = 0; polygon < branch.Polygons.Count; polygon++)
+                        livec += branch.Polygons[polygon].CornerCount;
+
+                    if (livec > MaxLiveCorners)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        Log.Warning($"BooleanOperation: refusing to continue. Combining with operand {i + 1} exceeds "
+                                    + $"the budget of {MaxLiveCorners:N0} live corners, so the operation was stopped. "
+                                    + "The result is empty.");
+                        return null;
+                    }
                 }
 
                 continue;
@@ -360,7 +399,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
                     // The operand's own polygons are shared across every branch and every left part, so
                     // each combine gets its own copy; a combine is free to consume what it is handed.
-                    var result = kernel.Combine(ClonePolygons(branch.Polygons), ClonePolygons(part.Polygons), operation);
+                    var result = kernel.Combine(ClonePolygons(branch.Polygons), ClonePolygons(part.Polygons), operation, i + 1);
                     if (result.Count == 0)
                         continue;
 
@@ -573,12 +612,21 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         }
     }
 
-    private static void WarnIfOpen(int boundaryEdges, int nonManifoldEdges)
+    private static void WarnIfOpen(int boundaryEdges, int nonManifoldEdges, int droppedCorners, int droppedFaces)
     {
         if (boundaryEdges == 0 && nonManifoldEdges == 0)
             return;
 
+        // Welding collapsed geometry before it could be written. It is named first because it is a
+        // cause rather than a symptom: the open edges below are where the dropped corners used to be.
+        var collapse = droppedCorners > 0 || droppedFaces > 0
+                           ? $" Writing the mesh had to merge {droppedCorners} corners and drop {droppedFaces} faces "
+                             + "because they fell within the weld tolerance of a corner next to them, which leaves "
+                             + "the neighbours of those faces open. "
+                           : string.Empty;
+
         Log.Warning($"BooleanOperation: the result has {boundaryEdges} open and {nonManifoldEdges} non-manifold edges. "
+                    + collapse
                     + "The operands are expected to be closed solids; an open or self-intersecting input has no inside to cut against. "
                     + "Surfaces that meet within the weld tolerance of each other are the other common cause.");
     }
@@ -588,6 +636,17 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         Union,
         Difference,
         Intersection,
+    }
+
+    /// <summary>
+    /// Raised from inside the BSP when one combine has built more fragments than
+    /// <see cref="MaxFragmentsPerCombine"/>, so the caller can abandon that combine and report it.
+    /// </summary>
+    private sealed class FragmentBudgetExceededException(string message) : Exception(message)
+    {
+        public string Stage { get; init; } = string.Empty;
+        public int OperandIndex { get; init; }
+        public int Fragments { get; init; }
     }
 
     private readonly MeshGeometry _output = new();
@@ -633,11 +692,12 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     /// </summary>
     private sealed class BspNode
     {
-        public BspNode(float epsilon, PointWeld weld, int attributeCount)
+        public BspNode(float epsilon, PointWeld weld, int attributeCount, Kernel kernel)
         {
             _epsilon = epsilon;
             _weld = weld;
             _attributeCount = attributeCount;
+            _kernel = kernel;
         }
 
         public HalfSpace Plane;
@@ -649,6 +709,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         private readonly float _epsilon;
         private readonly PointWeld _weld;
         private readonly int _attributeCount;
+        private readonly Kernel _kernel;
 
         private enum Side
         {
@@ -689,13 +750,13 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
                 if (front.Count > 0)
                 {
-                    node.Front ??= new BspNode(_epsilon, _weld, _attributeCount);
+                    node.Front ??= new BspNode(_epsilon, _weld, _attributeCount, _kernel);
                     work.Push((node.Front, front));
                 }
 
                 if (back.Count > 0)
                 {
-                    node.Back ??= new BspNode(_epsilon, _weld, _attributeCount);
+                    node.Back ??= new BspNode(_epsilon, _weld, _attributeCount, _kernel);
                     work.Push((node.Back, back));
                 }
             }
@@ -888,7 +949,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         /// carries the same corner twice folds onto itself - it would double an edge and leave the surface
         /// looking open.
         /// </summary>
-        private static Polygon? MakeChild(List<Vert> vertices, Polygon source)
+        private Polygon? MakeChild(List<Vert> vertices, Polygon source)
         {
             var write = 0;
             for (var read = 0; read < vertices.Count; read++)
@@ -911,6 +972,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
             if (write < vertices.Count)
                 vertices.RemoveRange(write, vertices.Count - write);
 
+            _kernel.OnFragmentCreated();
             return new Polygon(vertices.ToArray(), source.Plane, source.SourceOperand);
         }
 
@@ -933,7 +995,8 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                 attributes[i] = from + (to - from) * t;
             }
 
-            return new Vert(position, _weld.GetOrAddPoint(position)) { Attributes = attributes };
+            var id = _weld.GetOrAddPoint(position);
+            return new Vert(_weld.Positions[id], id) { Attributes = attributes };
         }
     }
 
@@ -960,7 +1023,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         /// solid, difference keeps the left surface outside and the right surface inside (reversed, so
         /// it faces the cavity it opens), intersection keeps both surfaces inside the other solid.
         /// </summary>
-        public List<Polygon> Combine(List<Polygon> left, List<Polygon> right, Operations operation)
+        public List<Polygon> Combine(List<Polygon> left, List<Polygon> right, Operations operation, int operandIndex = 0)
         {
             if (right.Count == 0)
                 return operation == Operations.Intersection ? [] : left;
@@ -968,11 +1031,18 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
             if (left.Count == 0)
                 return operation == Operations.Union ? right : [];
 
-            var nodeA = new BspNode(_epsilon, _weld, _schema.ComponentCount);
-            var nodeB = new BspNode(_epsilon, _weld, _schema.ComponentCount);
+            _operandIndex = operandIndex;
+            _fragments = 0;
+
+            var nodeA = new BspNode(_epsilon, _weld, _schema.ComponentCount, this);
+            var nodeB = new BspNode(_epsilon, _weld, _schema.ComponentCount, this);
+
+            _stage = "building the tree of the first solid";
             nodeA.Build(left);
+            _stage = "building the tree of the second solid";
             nodeB.Build(right);
 
+            _stage = "clipping the two trees against each other";
             switch (operation)
             {
                 case Operations.Union:
@@ -1001,11 +1071,39 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                     break;
             }
 
+            _stage = "rebuilding one tree with the other's surviving polygons";
             nodeA.Build(nodeB.AllPolygons());
             if (operation != Operations.Union)
                 nodeA.Invert();
 
+            _stage = "collecting the result";
             return nodeA.AllPolygons();
+        }
+
+        /// <summary>
+        /// One polygon fragment was created. The BSP allocates a fresh polygon, a vertex array and a
+        /// per-corner attribute array for every cut, so the fragment count is what the operation's
+        /// memory scales with - and the one quantity that runs away when a near-coplanar plane or a
+        /// self-overlapping polygon sends the splitter into cutting slivers off slivers. The budgets in
+        /// the caller only see a combine after it has returned, which is too late to keep that off the
+        /// heap; this is checked where the fragments are made instead.
+        /// </summary>
+        public void OnFragmentCreated()
+        {
+            if (++_fragments <= MaxFragmentsPerCombine)
+                return;
+
+            throw new FragmentBudgetExceededException(
+                                                      $"BooleanOperation: stopped {_stage} for operand {_operandIndex} after "
+                                                      + $"{MaxFragmentsPerCombine:N0} polygon fragments were built. A fragment is one "
+                                                      + "piece of a cut polygon, so this many means the splitter is subdividing "
+                                                      + "without converging - a near-coplanar surface or a polygon that overlaps "
+                                                      + "itself does that. The result is empty.")
+                {
+                    Stage = _stage,
+                    OperandIndex = _operandIndex,
+                    Fragments = _fragments,
+                };
         }
 
         /// <summary>
@@ -1028,6 +1126,13 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
             // insertion below (the point that would split the edge is the polygon's own corner), so the
             // polygons are folded out into simple ones first.
             CleanUp(polygons);
+
+            // Two names for one point are the other way a face ends up with a corner that should not be
+            // there: the weld merges a cut point onto a neighbour within its radius, and two points that
+            // land a hair outside that radius stay separate even though both faces mean the same corner.
+            // Merging them here rewrites both faces together, so the surface stays closed, instead of
+            // leaving the emitter to drop the corner off one of them.
+            WeldedCorners(polygons);
 
             _usedPoints.Clear();
             foreach (var polygon in polygons)
@@ -1091,8 +1196,140 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                 if (!changed)
                     continue;
 
-                polygon.Vertices = _repairedVertices.ToArray();
+                // Adding a corner is only safe if it does not land on one of the polygon's own corners:
+                // the emitter drops a corner that matches its predecessor, and a dropped corner tears
+                // the face's edge away from a neighbour that still names it. Insertions are kept only
+                // where every original corner stays weld-free, which preserves the subdivision this
+                // pass exists for while leaving the polygon's own corners untouched.
+                _keptVertices.Clear();
+                for (var v = 0; v < _repairedVertices.Count; v++)
+                {
+                    var vertex = _repairedVertices[v];
+                    if (_keptVertices.Count > 0 && _keptVertices[^1].PointId == vertex.PointId)
+                        continue;
+
+                    if (v < count || IsInsertion(_repairedVertices, v, count))
+                        _keptVertices.Add(vertex);
+                }
+
+                while (_keptVertices.Count > 1 && _keptVertices[^1].PointId == _keptVertices[0].PointId)
+                    _keptVertices.RemoveAt(_keptVertices.Count - 1);
+
+                if (_keptVertices.Count < 3 || _keptVertices.Count < count)
+                    continue;
+
+                polygon.Vertices = _keptVertices.ToArray();
             }
+        }
+
+        /// <summary>
+        /// Merges corners across the whole result that lie within the weld radius of each other, so a
+        /// point the weld left as two ids becomes one id in every face that meets there - including two
+        /// faces that only touch through that point, which is exactly the pair a per-polygon pass cannot
+        /// see.
+        /// </summary>
+        private void WeldedCorners(List<Polygon> polygons)
+        {
+            // Merging runs at the T-junction pass's radius, not the weld radius: a corner that several
+            // faces share can sit just outside the weld radius and still be one corner, because the two
+            // copies were computed by different arithmetic and their distance is noise rather than a gap.
+            // The weld radius is too tight to absorb that - on this geometry the pair sits 3.2um apart
+            // where the weld radius is 2.2um - and leaving them apart is what lets the emitter drop a face.
+            var toleranceSq = _gridToleranceSq;
+            var radius = _gridTolerance;
+            var cell = MathF.Max(radius * 2f, _gridCell);
+            var scale = 1f / cell;
+
+            _weldedRepresentatives.Clear();
+            _weldedRemap.Clear();
+            _weldLookup.Clear();
+
+            var mergedCount = 0;
+            foreach (var polygon in polygons)
+            {
+                var vertices = polygon.Vertices;
+                var changed = false;
+                for (var i = 0; i < vertices.Length; i++)
+                {
+                    var vertex = vertices[i];
+                    if (_weldedRemap.TryGetValue(vertex.PointId, out var replacementIndex))
+                    {
+                        vertices[i] = _weldedRepresentatives[replacementIndex];
+                        changed = true;
+                        continue;
+                    }
+
+                    var position = vertex.Position;
+                    var cellX = (long)MathF.Floor(position.X * scale);
+                    var cellY = (long)MathF.Floor(position.Y * scale);
+                    var cellZ = (long)MathF.Floor(position.Z * scale);
+                    var found = -1;
+                    for (var dz = -1; dz <= 1 && found < 0; dz++)
+                    for (var dy = -1; dy <= 1 && found < 0; dy++)
+                    for (var dx = -1; dx <= 1 && found < 0; dx++)
+                    {
+                        if (!_weldLookup.TryGetValue((cellX + dx, cellY + dy, cellZ + dz), out var bucket))
+                            continue;
+
+                        foreach (var candidate in bucket)
+                        {
+                            if (Vector3.DistanceSquared(_weldedRepresentatives[candidate].Position, position) > toleranceSq)
+                                continue;
+
+                            found = candidate;
+                            break;
+                        }
+                    }
+
+                    if (found < 0)
+                    {
+                        _weldLookup[(cellX, cellY, cellZ)] = [_weldedRepresentatives.Count];
+                        _weldedRepresentatives.Add(vertex);
+                        continue;
+                    }
+
+                    var kept = _weldedRepresentatives[found];
+                    _weldedRemap[vertex.PointId] = found;
+                    vertices[i] = kept;
+                    changed = true;
+                    mergedCount++;
+                }
+
+                if (!changed)
+                    continue;
+
+                // A replacement can land next to the corner it became, so repeats go now.
+                _keptVertices.Clear();
+                foreach (var vertex in vertices)
+                {
+                    if (_keptVertices.Count > 0 && _keptVertices[^1].PointId == vertex.PointId)
+                        continue;
+
+                    _keptVertices.Add(vertex);
+                }
+
+                while (_keptVertices.Count > 1 && _keptVertices[^1].PointId == _keptVertices[0].PointId)
+                    _keptVertices.RemoveAt(_keptVertices.Count - 1);
+
+                polygon.Vertices = _keptVertices.Count >= 3 ? _keptVertices.ToArray() : [];
+            }
+        }
+
+        /// <summary>
+        /// Whether an inserted corner at <paramref name="index"/> keeps the weld radius clear of the
+        /// polygon's own corners: inside that radius the emitter merges the two, so the insertion would
+        /// not subdivide the edge but collapse the corner beside it.
+        /// </summary>
+        private bool IsInsertion(List<Vert> vertices, int index, int originalCount)
+        {
+            var position = vertices[index].Position;
+            for (var c = 0; c < originalCount; c++)
+            {
+                if (Vector3.DistanceSquared(vertices[c].Position, position) < _weld.ToleranceSq)
+                    return false;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -1490,6 +1727,8 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
             _faceCut.Clear();
             _faceComponents.Clear();
             _faceOffsets.Add(0);
+            _droppedCorners = 0;
+            _droppedFaces = 0;
 
             var currentComponent = int.MinValue;
             for (var polygonIndex = 0; polygonIndex < polygons.Count; polygonIndex++)
@@ -1519,7 +1758,10 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                     }
 
                     if (_cornerPoints.Count > faceStart && _cornerPoints[^1] == mapped)
+                    {
+                        _droppedCorners++;
                         continue;
+                    }
 
                     _cornerPoints.Add(mapped);
                     _cornerAttributes.Add(vertex.Attributes);
@@ -1529,10 +1771,13 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                 {
                     _cornerPoints.RemoveAt(_cornerPoints.Count - 1);
                     _cornerAttributes.RemoveAt(_cornerAttributes.Count - 1);
+                    _droppedCorners++;
                 }
 
                 if (_cornerPoints.Count - faceStart < 3)
                 {
+                    _droppedFaces++;
+                    _droppedCorners += _cornerPoints.Count - faceStart;
                     _cornerPoints.RemoveRange(faceStart, _cornerPoints.Count - faceStart);
                     _cornerAttributes.RemoveRange(faceStart, _cornerAttributes.Count - faceStart);
                     continue;
@@ -1702,6 +1947,10 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         private readonly HashSet<int> _seenInPolygon = [];
         private readonly Dictionary<(long, long, long), List<int>> _grid = [];
         private readonly List<Vert> _repairedVertices = [];
+        private readonly List<Vert> _keptVertices = [];
+        private readonly List<Vert> _weldedRepresentatives = [];
+        private readonly Dictionary<int, int> _weldedRemap = [];
+        private readonly Dictionary<(long, long, long), List<int>> _weldLookup = [];
         private readonly List<EdgeHit> _edgeHits = [];
         private readonly List<Polygon> _reordered = [];
         private readonly List<int> _components = [];
@@ -1709,6 +1958,23 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         private readonly Dictionary<int, int> _componentOfRoot = [];
         private readonly Dictionary<int, List<int>> _byRoot = [];
         private readonly List<int> _order = [];
+
+        /** Fragments built during the combine that is running, against <see cref="MaxFragmentsPerCombine"/>. */
+        private int _fragments;
+        /** The operand slot the running combine is folding in, for the budget message. */
+        private int _operandIndex;
+        /** Which part of the combine is running, so a budget abort names where it blew up. */
+        private string _stage = "combining";
+        /** Corners the emitter merged away, and faces it dropped because too few were left. */
+        private int _droppedCorners;
+        private int _droppedFaces;
+
+        /// <summary>
+        /// Corners and faces <see cref="Emit"/> had to drop because welding collapsed them. A dropped
+        /// corner detaches a face edge from the neighbour that still names it, which is the usual source
+        /// of a "result is open" warning, so the emitter reports the loss instead of hiding it.
+        /// </summary>
+        public (int Corners, int Faces) DroppedAtEmit => (_droppedCorners, _droppedFaces);
     }
 
     /// <summary>Classifier slack, as a fraction of the smallest operand's extent.</summary>
@@ -1726,6 +1992,16 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
     /// <summary>Cap on the samples taken along one edge while looking for points lying on it.</summary>
     private const int MaxEdgeSamples = 8192;
+
+    /// <summary>
+    /// Fragment budget for one combine. Every cut builds a polygon, a vertex array and a per-corner
+    /// attribute array, so this is what an operation's memory actually scales with - and the count that
+    /// runs away when the BSP cannot converge on a degenerate input. The caller's own budgets are
+    /// measured once a combine has returned, which is after the allocation has already happened, so this
+    /// one is enforced inside the splitter. It sits orders of magnitude above a legitimate combine of two
+    /// solids (hundreds to thousands of fragments), so reaching it means the splitter is not converging.
+    /// </summary>
+    private const int MaxFragmentsPerCombine = 2_000_000;
 
     /// <summary>
     /// How many result parts the operation is willing to produce. A part-wide operand fans every branch
