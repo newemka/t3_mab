@@ -1,6 +1,8 @@
 #nullable enable
 using LibTessDotNet;
 using Poly2Tri;
+// Lib.geometry.Polygon (the mesh kernel's convex polygon) shadows Poly2Tri.Polygon inside this
+// namespace, so the cap triangulation below names Poly2Tri's type explicitly.
 
 using System;
 using T3.Core.DataTypes.Geometry;
@@ -486,7 +488,7 @@ internal sealed class CurvesToGeometryExp : Instance<CurvesToGeometryExp>
                     _capOuterPoints.Add(pp);
                 }
 
-                var polygon = new Polygon(_capOuterPoints);
+                var polygon = new Poly2Tri.Polygon(_capOuterPoints);
 
                 _capHoleLoops.Clear();
                 foreach (var holeIdx in _capHoleIndices)
@@ -501,7 +503,7 @@ internal sealed class CurvesToGeometryExp : Instance<CurvesToGeometryExp>
                         _capBoundaryPointToId[pp] = pointId;
                         _capHolePoints.Add(pp);
                     }
-                    polygon.AddHole(new Polygon(_capHolePoints));
+                    polygon.AddHole(new Poly2Tri.Polygon(_capHolePoints));
                     _capHoleLoops.Add(holeLoop);
                 }
 
