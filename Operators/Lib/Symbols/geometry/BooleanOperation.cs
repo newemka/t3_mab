@@ -43,6 +43,11 @@ namespace Lib.geometry;
 /// intersection against it also cuts the space between the chunks. SplitOperandsIntoParts recovers
 /// the chunks from their connected shells for an intersection, which is the operation whose answer
 /// that changes. Solids are expected to be closed; the op warns when the result is not watertight.</para>
+///
+/// <para>Parts multiply: every operand part cuts every part that already exists, so two operands of n
+/// parts ask for n^2 result parts and a third multiplies again. Past a few thousand the op logs an
+/// error and returns an empty result instead of running, because that product is what exhausts
+/// memory. A result that is empty while the inputs looked usable is worth checking the log for.</para>
 /// </remarks>
 [Guid("3f9a1d64-7c25-4b8e-9a13-6e5d84c07b21")]
 internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressProvider
@@ -184,6 +189,34 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         var splitOperandsHere = splitOperands && operation == Operations.Intersection;
         var leftParts = LoadOperandParts(leftSource, schema, weld, kernel, origin, 0, splitOperandsHere);
 
+        // Every operand is loaded once for the whole operation. Loading is the expensive part - welding
+        // corners, fitting planes, triangulating faces - so it must not be repeated per fold step: with
+        // the workspaces loaded inside the fold, cost grows with the product of the part counts, which
+        // is how a many-part operand turns into gigabytes of short-lived polygons per frame even when
+        // the result is empty.
+        var rightOperands = new List<OperandPart>[rightSources.Count];
+        for (var i = 0; i < rightSources.Count; i++)
+        {
+            var right = rightSources[i];
+            rightOperands[i] = right == null || right.FaceCount == 0
+                                   ? []
+                                   : LoadOperandParts(right, schema, weld, kernel, origin, i + 1, splitOperandsHere);
+        }
+
+        // Refuse before any combination work when the parts would multiply past what a result can hold.
+        // The fold drives each left part through every operand, so the result part count is the product
+        // of the parts each operand actually contributes; letting that run is what consumes all
+        // available memory. The counts are measured rather than projected because splitting an operand
+        // at its shells turns one declared part into as many as it has shells, which a projection over
+        // the part table cannot see.
+        var projectedParts = ActualResultParts(leftParts.Count, rightOperands);
+        if (projectedParts > MaxResultParts)
+        {
+            WarnTooManyParts(projectedParts, leftParts.Count, rightOperands);
+            kernel.Emit(target, [], [], [], operation);
+            return;
+        }
+
         // The fold runs one left part at a time and drives that part through every operand before the
         // next left part starts. Branching multiplies - a part-wide fan-out turns n parts into n
         // branches per operand, and folding the product forward would hold every combination of every
@@ -196,8 +229,8 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var folded = FoldOperands(new Branch(leftParts[p].Polygons, leftParts[p].Seed), rightSources, schema, weld, kernel,
-                                      origin, operation, splitOperandsHere, cancellationToken);
+            var folded = FoldOperands(new Branch(leftParts[p].Polygons, leftParts[p].Seed), rightOperands, kernel, operation,
+                                      cancellationToken);
             if (folded == null)
             {
                 budgetExceeded = true;
@@ -276,7 +309,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     }
 
     /// <summary>One operand solid: its polygons, and the seed of the part it descends from.</summary>
-    private readonly record struct OperandPart(List<Polygon> Polygons, int Seed);
+    internal readonly record struct OperandPart(List<Polygon> Polygons, int Seed);
 
     /// <summary>
     /// Drives one starting branch through every right operand and returns the branches that survive,
@@ -286,25 +319,17 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     /// expanded before the next operand is read: only one generation is ever live, instead of the
     /// product of every operand's part count.</para>
     /// </summary>
-    private static List<Branch>? FoldOperands(Branch start, IReadOnlyList<MeshGeometry> rightSources,
-                                              AttributeSchema schema, PointWeld weld, Kernel kernel, Vector3 origin,
-                                              Operations operation, bool splitOperands, CancellationToken cancellationToken)
+    private static List<Branch>? FoldOperands(Branch start, IReadOnlyList<OperandPart>[] rightOperands, Kernel kernel,
+                                              Operations operation, CancellationToken cancellationToken)
     {
         var generation = new List<Branch> { start };
         var expansion = new List<Branch>();
 
-        for (var i = 0; i < rightSources.Count; i++)
+        for (var i = 0; i < rightOperands.Length; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var right = rightSources[i];
-            if (right == null || right.FaceCount == 0)
-                continue;
-
-            // A right operand that declares no parts is still one solid per connected shell when the
-            // caller asked for that, so a scattered operand cuts one piece at a time instead of being
-            // intersected against everything between its pieces.
-            var rightParts = LoadOperandParts(right, schema, weld, kernel, origin, i + 1, splitOperands);
+            var rightParts = rightOperands[i];
             if (rightParts.Count == 0)
                 continue;
 
@@ -333,6 +358,8 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                     if (part.Polygons.Count == 0)
                         continue;
 
+                    // The operand's own polygons are shared across every branch and every left part, so
+                    // each combine gets its own copy; a combine is free to consume what it is handed.
                     var result = kernel.Combine(ClonePolygons(branch.Polygons), ClonePolygons(part.Polygons), operation);
                     if (result.Count == 0)
                         continue;
@@ -344,13 +371,14 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                 }
 
                 // Parts multiply: every operand part fans every branch, so the live polygon set can
-                // grow by a factor per operand. Past the budget the fold stops; the caller drops the
-                // partial result rather than emit something that looks finished.
+                // grow by a factor per operand. The pre-flight check bounds the part count, but a few
+                // parts can still be very heavy, so the corner count is the second line of defence.
                 if (live > MaxLiveCorners)
                 {
-                    Log.Warning($"BooleanOperation: combining {rightParts.Count} operand parts with {generation.Count} "
-                                + $"branches exceeds the budget of {MaxLiveCorners:N0} live corners, so the operation was "
-                                + "stopped. Reduce the number of parts, or turn off SplitOperandsIntoParts.");
+                    Log.Warning($"BooleanOperation: refusing to continue. Combining {rightParts.Count} operand parts "
+                                + $"with {generation.Count} parts exceeds the budget of {MaxLiveCorners:N0} live corners, "
+                                + "so the operation was stopped. Reduce the number of parts, or turn off "
+                                + "SplitOperandsIntoParts. The result is empty.");
                     return null;
                 }
             }
@@ -362,6 +390,58 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         }
 
         return generation;
+    }
+
+    /// <summary>
+    /// How many result parts the fold would produce: one branch per left part, multiplied by the number
+    /// of parts each operand actually contributes. Saturates at <see cref="int.MaxValue"/> instead of
+    /// overflowing, because the exact figure past the limit does not matter - only that it is past it.
+    /// </summary>
+    internal static int ActualResultParts(int leftPartCount, IReadOnlyList<OperandPart>[] rightOperands)
+    {
+        var projected = Math.Max(leftPartCount, 1);
+        for (var i = 0; i < rightOperands.Length; i++)
+        {
+            // An operand contributing a single solid does not fan, however many faces it has.
+            var parts = rightOperands[i].Count;
+            if (parts <= 1)
+                continue;
+
+            if (projected > int.MaxValue / parts)
+                return int.MaxValue;
+
+            projected *= parts;
+        }
+
+        return projected;
+    }
+
+    /// <summary>
+    /// Reports a refused operation. The message names the operand that pushes the product over the
+    /// limit, because "there are too many parts" is not actionable on its own.
+    /// </summary>
+    private static void WarnTooManyParts(int projectedParts, int leftPartCount, IReadOnlyList<OperandPart>[] rightOperands)
+    {
+        var worstIndex = -1;
+        var worstCount = 0;
+        for (var i = 0; i < rightOperands.Length; i++)
+        {
+            if (rightOperands[i].Count > worstCount)
+            {
+                worstCount = rightOperands[i].Count;
+                worstIndex = i;
+            }
+        }
+
+        var culprit = worstIndex >= 0
+                          ? $"Operand {worstIndex + 1} contributes {worstCount} parts"
+                          : $"The left input contributes {leftPartCount} parts";
+
+        Log.Warning($"BooleanOperation: refusing to run. {culprit} and the operands would multiply out to "
+                    + $"{projectedParts:N0} result parts, which is past the limit of {MaxResultParts:N0}. Each operand "
+                    + "part cuts every existing part, so the count multiplies rather than adds - this is what exhausts "
+                    + "memory. Reduce the number of parts, combine the operands in stages, or turn off "
+                    + "SplitOperandsIntoParts. The result is empty.");
     }
 
     /// <summary>
@@ -1647,6 +1727,16 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     /// <summary>Cap on the samples taken along one edge while looking for points lying on it.</summary>
     private const int MaxEdgeSamples = 8192;
 
+    /// <summary>
+    /// How many result parts the operation is willing to produce. A part-wide operand fans every branch
+    /// into one branch per part, so the count multiplies across operands - and since the fold drives each
+    /// left part through every operand, the total is the product of every operand's part count. Two
+    /// 64-part operands already ask for 4096 result parts, and a third multiplies again.
+    ///
+    /// <para>Past this the operation refuses rather than tries: a result of this many parts is not
+    /// something a composition can consume, and attempting it is what exhausts memory.</para>
+    /// </summary>
+    internal const int MaxResultParts = 4096;
     /// <summary>
     /// Corner budget for the fold. Each operand part fans every branch, so the live polygon set grows
     /// by a factor per operand and a many-part operand multiplies out quickly. This is a backstop

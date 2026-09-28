@@ -89,7 +89,8 @@ internal sealed class MeshGeometryOutputUi : OutputUi<MeshGeometry>
     private void DrawPartTable()
     {
         const ImGuiTableFlags flags = ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit;
-        var height = Math.Min(_partRowCount + 1, MaxVisiblePartRows) * ImGui.GetTextLineHeightWithSpacing();
+        var available = ImGui.GetContentRegionAvail();
+        var height = available.Y;
         if (!ImGui.BeginTable("Parts", 6, flags, new Vector2(0, height)))
             return;
 
@@ -106,7 +107,8 @@ internal sealed class MeshGeometryOutputUi : OutputUi<MeshGeometry>
         {
             var clipperData = new ImGuiListClipper();
             var clipper = new ImGuiListClipperPtr(&clipperData);
-            clipper.Begin(_partRowCount, ImGui.GetTextLineHeightWithSpacing());
+            var rowHeight = ImGui.GetTextLineHeightWithSpacing() + ImGui.GetStyle().CellPadding.Y * 2;
+            clipper.Begin(_partRowCount, rowHeight);
             while (clipper.Step())
             {
                 for (var row = clipper.DisplayStart; row < clipper.DisplayEnd; row++)
@@ -245,7 +247,6 @@ internal sealed class MeshGeometryOutputUi : OutputUi<MeshGeometry>
     private const float LabelWidth = 90;
     private const int MaxLines = 8;
     private const int MaxAttributes = 32;
-    private const int MaxVisiblePartRows = 24;
 
     private int _partRowCount;
     private string[] _partIndexTexts = [];
