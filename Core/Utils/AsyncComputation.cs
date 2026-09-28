@@ -99,6 +99,11 @@ public sealed class AsyncComputation<T> where T : class
     /// off), so the worker can't race the synchronous computation on shared scratch
     /// buffers. Also releases the slot's compute trigger, which would otherwise keep
     /// the op re-evaluating every frame.
+    ///
+    /// <para>The caller then computes synchronously and its <see cref="Update"/> is never called
+    /// again while the async path is off, so this is the last chance to release the finished job:
+    /// the task and its result, and the token source. <see cref="_computedVersion"/> is reset so a
+    /// later return to the async path recomputes instead of trusting the discarded result.</para>
     /// </summary>
     public void WaitForPending(Slot<T> resultSlot)
     {
@@ -114,8 +119,14 @@ public sealed class AsyncComputation<T> where T : class
         }
         catch (AggregateException)
         {
-            // Cancelled or failed - either way it has exited; collected by the next Update
+            // Cancelled or failed - either way it has exited.
         }
+
+        _runningTask = null;
+        _cancellation?.Dispose();
+        _cancellation = null;
+        _latestResult = null;
+        _computedVersion = NoResultVersion;
     }
 
     /// <summary>
@@ -145,10 +156,13 @@ public sealed class AsyncComputation<T> where T : class
 
     private const double UiProgressDelay = 0.5;
 
+    /// <summary>A version no real input hash can take, so it never matches and always recomputes.</summary>
+    private const int NoResultVersion = -1;
+
     private Task<T>? _runningTask;
     private CancellationTokenSource? _cancellation;
     private T? _latestResult;
-    private int _computedVersion = -1;
+    private int _computedVersion = NoResultVersion;
     private int _runningVersion;
     private bool _resultJustLanded;
     private volatile float _progress;

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading;
 using Lib.Utils;
 using T3.Core.DataTypes;
 using T3.Core.DataTypes.Geometry;
@@ -63,17 +64,21 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         _splitIntoParts = SplitIntoParts.GetValue(context);
 
         var leftSource = Geometry.GetValue(context);
-        var additional = Operands.GetCollectedTypedInputs();
-        var rightSources = new List<MeshGeometry>(additional.Count);
+
+        // Read through GetValues so the multi-input's dirty flag is synced afterwards. Collecting its
+        // slots without clearing leaves the op looking changed to every later invalidation walk, and the
+        // output window walks once per frame - the op would then never go idle or stop recomputing.
+        Operands.GetValues(ref _operandValues, context);
+        var rightSources = _operandValues;
+
         var hash = new HashCode();
         hash.Add(_operation);
         hash.Add(_splitIntoParts);
         hash.Add(leftSource?.Version ?? 0);
         hash.Add(leftSource?.GetHashCode() ?? 0);
-        for (var i = 0; i < additional.Count; i++)
+        for (var i = 0; i < rightSources.Length; i++)
         {
-            var source = additional[i].GetValue(context);
-            rightSources.Add(source);
+            var source = rightSources[i];
             if (source == null)
                 continue;
 
@@ -92,14 +97,14 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         if (Async.GetValue(context))
         {
             var capturedLeft = leftSource;
-            var capturedRights = rightSources.ToArray();
+            var capturedRights = (MeshGeometry[])rightSources.Clone();
             var capturedOperation = _operation;
             var capturedSplit = _splitIntoParts;
             var result = _asyncComputation.Update(context, Result, hash.ToHashCode(),
                                                   token =>
                                                   {
                                                       var target = new MeshGeometry();
-                                                      Evaluate(capturedLeft, capturedRights, capturedOperation, capturedSplit, target);
+                                                      Evaluate(capturedLeft, capturedRights, capturedOperation, capturedSplit, target, token);
                                                       return target;
                                                   });
             Result.Value = result ?? _output;
@@ -118,7 +123,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     /// hands the input on untouched - attributes and part table included - instead of rebuilding an
     /// equivalent mesh and dropping whatever the kernel does not carry.
     /// </summary>
-    private static bool HasAnythingToCombine(List<MeshGeometry> rightSources)
+    private static bool HasAnythingToCombine(IReadOnlyList<MeshGeometry> rightSources)
     {
         for (var i = 0; i < rightSources.Count; i++)
         {
@@ -133,9 +138,14 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     /// Runs the whole boolean against plain geometries, without an operator instance or an
     /// evaluation context. The op's own Update goes through here too, so the diagnostics exercise
     /// the exact code path that ships rather than a parallel copy of it.
+    ///
+    /// <para>Geometry stays one solid. Operand slots fold left to right, as before - but when one
+    /// operand carries a part table, its parts are separate solids rather than one lump: the branch
+    /// splits into one per part, each cut on its own. Combining a fracture's cells as a lump would
+    /// intersect against their union instead of against each cell.</para>
     /// </summary>
     internal static void Evaluate(MeshGeometry leftSource, IReadOnlyList<MeshGeometry> rightSources, Operations operation,
-                                  bool splitIntoParts, MeshGeometry target)
+                                  bool splitIntoParts, MeshGeometry target, CancellationToken cancellationToken = default)
     {
         var extent = ExtentOf(leftSource, rightSources);
 
@@ -149,24 +159,134 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         var schema = AttributeSchema.Resolve(leftSource, rightSources);
         var kernel = new Kernel(weld, schema, extent, origin);
 
-        var current = Solid.Load(leftSource, schema, weld, 0, origin);
+        // One branch is one evolving result solid. A single-part operand folds into every branch; a
+        // multi-part operand fans each branch out into one branch per part.
+        var branches = new List<Branch> { new(Solid.Load(leftSource, schema, weld, 0, origin), 0) };
+
         for (var i = 0; i < rightSources.Count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var right = rightSources[i];
             if (right == null || right.FaceCount == 0)
                 continue;
 
-            var solid = Solid.Load(right, schema, weld, i + 1, origin);
-            if (solid.Count == 0)
-                continue;
+            var partCount = right.Parts.Length > 0 ? right.Parts.Length : 1;
+            if (partCount == 1)
+            {
+                var (faceStart, faceCount, _) = PartRange(right, 0);
+                var solid = Solid.Load(right, schema, weld, i + 1, origin, faceStart, faceCount);
+                if (solid.Count == 0)
+                    continue;
 
-            current = kernel.Combine(current, solid, operation);
+                for (var b = 0; b < branches.Count; b++)
+                {
+                    var branch = branches[b];
+                    branch.Polygons = kernel.Combine(ClonePolygons(branch.Polygons), ClonePolygons(solid), operation);
+                }
+
+                continue;
+            }
+
+            var fan = new List<Branch>(branches.Count * partCount);
+            for (var b = 0; b < branches.Count; b++)
+            {
+                var branch = branches[b];
+                for (var partIndex = 0; partIndex < partCount; partIndex++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var (faceStart, faceCount, seed) = PartRange(right, partIndex);
+                    var solid = Solid.Load(right, schema, weld, i + 1, origin, faceStart, faceCount);
+                    if (solid.Count == 0)
+                        continue;
+
+                    var result = kernel.Combine(ClonePolygons(branch.Polygons), solid, operation);
+                    if (result.Count == 0)
+                        continue;
+
+                    fan.Add(new Branch(result, seed));
+                }
+            }
+
+            branches = fan;
         }
 
-        kernel.RepairTJunctions(current);
-        var components = splitIntoParts ? kernel.OrderByComponent(current) : [];
-        kernel.Emit(target, current, components, operation);
-        WarnIfOpen(target);
+        var combined = new List<Polygon>();
+        var components = new List<int>();
+        var partSeeds = new List<int>();
+
+        foreach (var branch in branches)
+        {
+            if (branch.Polygons.Count == 0)
+                continue;
+
+            kernel.RepairTJunctions(branch.Polygons);
+
+            if (splitIntoParts)
+            {
+                var shells = kernel.OrderByComponent(branch.Polygons);
+                var shellCount = 0;
+                for (var p = 0; p < shells.Length; p++)
+                    shellCount = Math.Max(shellCount, shells[p] + 1);
+
+                var baseIndex = partSeeds.Count;
+                for (var p = 0; p < branch.Polygons.Count; p++)
+                {
+                    combined.Add(branch.Polygons[p]);
+                    components.Add(baseIndex + shells[p]);
+                }
+
+                for (var shell = 0; shell < shellCount; shell++)
+                    partSeeds.Add(branch.Seed);
+            }
+            else
+            {
+                var partId = partSeeds.Count;
+                foreach (var polygon in branch.Polygons)
+                {
+                    combined.Add(polygon);
+                    components.Add(partId);
+                }
+
+                partSeeds.Add(branch.Seed);
+            }
+        }
+
+        kernel.Emit(target, combined, components.ToArray(), partSeeds.ToArray(), operation);
+
+        // Parts are emitted with their own points, so an index-based measure is a per-part measure here
+        // and a shared face between two touching parts cannot look non-manifold to it.
+        var stats = new MeshGeometryStats();
+        stats.Measure(target);
+        WarnIfOpen(stats.BoundaryEdges, stats.NonManifoldEdges);
+    }
+
+    /// <summary>Face range and seed of one operand part; a mesh without a part table is one whole solid.</summary>
+    private static (int FaceStart, int FaceCount, int Seed) PartRange(MeshGeometry mesh, int partIndex)
+    {
+        if (mesh.Parts.Length == 0)
+            return (0, mesh.FaceCount, 0);
+
+        var part = mesh.Parts[partIndex];
+        return (part.FaceStart, part.FaceCount, part.SeedIndex);
+    }
+
+    /// <summary>An evolving result solid and the operand part it descends from.</summary>
+    private sealed class Branch(List<Polygon> polygons, int seed)
+    {
+        public List<Polygon> Polygons = polygons;
+        public readonly int Seed = seed;
+    }
+
+    /// <summary>Shallow-copies a polygon list into fresh wrappers that share the immutable vertex attributes.</summary>
+    private static List<Polygon> ClonePolygons(List<Polygon> source)
+    {
+        var clone = new List<Polygon>(source.Count);
+        foreach (var polygon in source)
+            clone.Add(new Polygon((Vert[])polygon.Vertices.Clone(), polygon.Plane, polygon.SourceOperand));
+
+        return clone;
     }
 
     /// <summary>
@@ -230,14 +350,12 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         }
     }
 
-    private static void WarnIfOpen(MeshGeometry geometry)
+    private static void WarnIfOpen(int boundaryEdges, int nonManifoldEdges)
     {
-        var topology = new WeldedMeshTopology();
-        topology.Measure(geometry, WeldCheckToleranceFactor);
-        if (topology.BoundaryEdges == 0 && topology.NonManifoldEdges == 0)
+        if (boundaryEdges == 0 && nonManifoldEdges == 0)
             return;
 
-        Log.Warning($"BooleanOperation: the result has {topology.BoundaryEdges} open and {topology.NonManifoldEdges} non-manifold edges. "
+        Log.Warning($"BooleanOperation: the result has {boundaryEdges} open and {nonManifoldEdges} non-manifold edges. "
                     + "The operands are expected to be closed solids; an open or self-intersecting input has no inside to cut against. "
                     + "Surfaces that meet within the weld tolerance of each other are the other common cause.");
     }
@@ -251,6 +369,9 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
     private readonly MeshGeometry _output = new();
     private readonly AsyncComputation<MeshGeometry> _asyncComputation = new();
+
+    /// <summary>Reused buffer for the collected operands, so reading them allocates nothing per frame.</summary>
+    private MeshGeometry[] _operandValues = [];
     private Operations _operation;
     private bool _splitIntoParts;
 
@@ -583,18 +704,24 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     /// </summary>
     private static class Solid
     {
-        public static List<Polygon> Load(MeshGeometry source, AttributeSchema schema, PointWeld weld, int operandIndex, Vector3 origin)
+        public static List<Polygon> Load(MeshGeometry source, AttributeSchema schema, PointWeld weld, int operandIndex, Vector3 origin,
+                                         int faceStart = 0, int faceCount = -1)
         {
             var polygons = new List<Polygon>();
             if (source == null || source.FaceCount == 0)
                 return polygons;
+
+            var firstFace = Math.Clamp(faceStart, 0, source.FaceCount);
+            var lastFace = faceCount < 0
+                               ? source.FaceCount
+                               : Math.Clamp(firstFace + faceCount, firstFace, source.FaceCount);
 
             var resolved = schema.ResolveFor(source);
             var offsets = source.FaceCornerOffsets;
             var corners = source.CornerPointIndices;
             var vertices = new List<Vert>(8);
 
-            for (var faceIndex = 0; faceIndex < source.FaceCount; faceIndex++)
+            for (var faceIndex = firstFace; faceIndex < lastFace; faceIndex++)
             {
                 var start = offsets[faceIndex];
                 var end = offsets[faceIndex + 1];
@@ -1284,7 +1411,6 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
             // radius, not the (larger) on-edge tolerance: further than the weld radius from the end it is
             // a real subdivision of the edge, inside it it simply is that end.
             var endSlack = _weld.Tolerance;
-            var touched = 0;
             foreach (var polygon in polygons)
             {
                 var count = polygon.CornerCount;
@@ -1317,10 +1443,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                     continue;
 
                 polygon.Vertices = _repairedVertices.ToArray();
-                touched++;
             }
-
-            Log.Debug($"BooleanOperation[{KernelVersion}]: t-junction repair touched {touched}/{polygons.Count} polygons", this);
         }
 
         /// <summary>
@@ -1647,13 +1770,17 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         /// Writes the surviving polygons out. Points are compacted to those actually referenced and
         /// vertices are keyed by point id, so the output keeps the sharing the kernel built and the
         /// mesh closes; degenerate polygons left behind by welding are dropped.
+        ///
+        /// <para>Every part gets its own points. Parts of one result are separate solids, and two that
+        /// touch would share a face across parts, which an index-based topology check reads as
+        /// non-manifold. A fracture emits its cells the same way.</para>
         /// </summary>
-        public void Emit(MeshGeometry target, List<Polygon> polygons, int[] components, Operations operation)
+        public void Emit(MeshGeometry target, List<Polygon> polygons, int[] components, int[] partSeeds, Operations operation)
         {
-            _pointRemap.Clear();
-            for (var i = 0; i < _weld.Positions.Count; i++)
+            if (_pointRemap.Length < _weld.Positions.Count)
             {
-                _pointRemap.Add(-1);
+                _pointRemap = new int[_weld.Positions.Count];
+                Array.Fill(_pointRemap, -1);
             }
 
             _positions.Clear();
@@ -1664,9 +1791,19 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
             _faceComponents.Clear();
             _faceOffsets.Add(0);
 
-            var skipped = 0;
+            var currentComponent = int.MinValue;
             for (var polygonIndex = 0; polygonIndex < polygons.Count; polygonIndex++)
             {
+                var component = components[polygonIndex];
+                if (component != currentComponent)
+                {
+                    currentComponent = component;
+                    foreach (var remappedPoint in _remappedPoints)
+                        _pointRemap[remappedPoint] = -1;
+
+                    _remappedPoints.Clear();
+                }
+
                 var polygon = polygons[polygonIndex];
                 var faceStart = _cornerPoints.Count;
                 for (var i = 0; i < polygon.CornerCount; i++)
@@ -1677,6 +1814,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                     {
                         mapped = _positions.Count;
                         _pointRemap[vertex.PointId] = mapped;
+                        _remappedPoints.Add(vertex.PointId);
                         _positions.Add(_weld.Positions[vertex.PointId] + _origin);
                     }
 
@@ -1697,7 +1835,6 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                 {
                     _cornerPoints.RemoveRange(faceStart, _cornerPoints.Count - faceStart);
                     _cornerAttributes.RemoveRange(faceStart, _cornerAttributes.Count - faceStart);
-                    skipped++;
                     continue;
                 }
 
@@ -1708,11 +1845,8 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                 // such surface - its interface is gone entirely - so it marks nothing.
                 var faceIsCut = operation != Operations.Union && polygon.SourceOperand != 0 ? 1f : 0f;
                 _faceCut.Add(faceIsCut);
-                _faceComponents.Add(components.Length == 0 ? 0 : components[polygonIndex]);
+                _faceComponents.Add(components[polygonIndex]);
             }
-
-            Log.Debug($"BooleanOperation[{KernelVersion}]: emit polygons={polygons.Count} skipped={skipped} "
-                      + $"points={_positions.Count} corners={_cornerPoints.Count}", this);
 
             target.Positions = _positions.ToArray();
             target.FaceCornerOffsets = _faceOffsets.ToArray();
@@ -1737,7 +1871,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                 selection.Values[face] = _faceCut[face];
             }
 
-            target.Parts = components.Length == 0 ? [] : BuildParts(target);
+            target.Parts = components.Length == 0 ? [] : BuildParts(target, partSeeds);
             target.InvalidateTopologyCaches();
         }
 
@@ -1794,9 +1928,11 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
         /// <summary>
         /// Turns the per-face component index recorded during <see cref="Emit"/> into the part table.
-        /// Polygons were ordered by component, so each part is a contiguous face range.
+        /// Polygons were ordered by component, so each part is a contiguous face range. A part keeps the
+        /// seed index of the operand part it came from, which is what lets a downstream op map a result
+        /// piece back to the fracture cell that cut it.
         /// </summary>
-        private GeometryPart[] BuildParts(MeshGeometry geometry)
+        private GeometryPart[] BuildParts(MeshGeometry geometry, int[] partSeeds)
         {
             var faceCount = geometry.FaceCount;
             if (faceCount == 0)
@@ -1816,8 +1952,9 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                     face++;
                 }
 
+                var seed = component >= 0 && component < partSeeds.Length ? partSeeds[component] : 0;
                 var pivot = MeshVolumeCentroid.Compute(geometry, range);
-                parts.Add(new GeometryPart(start, face - start, pivot, parts.Count, 0));
+                parts.Add(new GeometryPart(start, face - start, pivot, parts.Count, seed));
             }
 
             return parts.ToArray();
@@ -1851,7 +1988,10 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         private readonly float _gridCell;
         private readonly float _gridTolerance;
         private readonly float _gridToleranceSq;
-        private readonly List<int> _pointRemap = [];
+        private int[] _pointRemap = [];
+
+        /// <summary>The weld points mapped for the part currently being emitted, so the next part can reset them.</summary>
+        private readonly List<int> _remappedPoints = [];
         private readonly List<Vector3> _positions = [];
         private readonly List<int> _faceOffsets = [];
         private readonly List<int> _cornerPoints = [];
@@ -1880,9 +2020,6 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     /// </summary>
     private const float WeldToleranceFactor = 4e-6f;
 
-    /// <summary>Tolerance for the watertightness warning; no wider than the cut weld, so a real crack is still reported.</summary>
-    private const float WeldCheckToleranceFactor = 4e-6f;
-
     /// <summary>Planarity threshold of a face, relative to its longest edge.</summary>
     private const float PlanarityTolerance = 1e-4f;
 
@@ -1906,7 +2043,4 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
     /// <summary>Cap on the samples taken along one edge while looking for points lying on it.</summary>
     private const int MaxEdgeSamples = 8192;
-
-    /// <summary>Bumped whenever the kernel changes, so a log line can be told from a stale build.</summary>
-    private const int KernelVersion = 5;
 }

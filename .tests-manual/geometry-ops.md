@@ -252,11 +252,29 @@ result.
 - Every toggle takes effect on the next frame: bevels vanish and return, and the
   downstream fracture recomputes each time (the chunk count changes).
 
+## Step: Boolean against a multi-part operand
+
+**Action:**
+Build `[CubeGeometry]` -> `[VoronoiFracture]` (seeds from a `[ScatterPointsInVolume]`, Count ~6) and
+wire the fracture into the `Operands` input of a `[BooleanOperation]`. Feed `Geometry` from a solid
+that overlaps the cube (another `[CubeGeometry]`, or text via `[TextToCurves]` ->
+`[CurvesToGeometry]`). Set `Operation` to Intersection.
+
+**Expected:**
+- `PartCount` equals the number of fracture cells that overlap `Geometry` - one result part per
+  cell - rather than the few connected pieces the cells' union would produce.
+- The output view lists those parts, each watertight, and each part's Seed Index matches the
+  Voronoi cell that cut it, so `[ColorFacesFromAttribute]` on "Part Seed Index" colours the pieces
+  per cell.
+- `SplitIntoParts` cuts a part further when one cell's intersection falls into separate shells.
+- Connecting a second operand still folds left to right: it applies to every cell's piece.
+
 ## Step: Async computation
 
 **Action:**
 On a heavy setup (e.g. a fractured OBJ mesh), enable the `Async` parameter on
-`[VoronoiFracture]` (and/or `[BevelGeometry]`), then drag upstream parameters.
+`[VoronoiFracture]` (and/or `[BevelGeometry]` or `[BooleanOperation]`), then drag
+upstream parameters.
 
 **Expected:**
 - The UI keeps its frame rate while dragging; the geometry snaps to the new
@@ -265,7 +283,8 @@ On a heavy setup (e.g. a fractured OBJ mesh), enable the `Async` parameter on
   with the new values right away (e.g. lowering the seed count of a slow
   fracture doesn't wait for the slow result first).
 - Switching `Async` off returns to immediate (blocking) updates with identical
-  results.
+  results, and an in-flight progress bar clears instead of staying up; the op
+  does not keep the last async result alive (memory does not stay elevated).
 - Rendering to a file waits for pending results (no stale frames in the export).
 
 ## Step: Centering geometry

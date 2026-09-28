@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System.Text;
 using ImGuiNET;
 using T3.Core.DataTypes.Vector;
@@ -359,6 +359,12 @@ internal sealed class ConsoleLogWindow : Window, ILogWriter
         lock (_logEntries)
         {
             _logEntries.Add(entry);
+
+            // Several operators log on every evaluation; without a cap the console grows for the whole session.
+            if (_logEntries.Count > MaxRetainedEntries)
+            {
+                _logEntries.RemoveRange(0, _logEntries.Count - MaxRetainedEntries);
+            }
         }
 
         if (_isAtBottom)
@@ -376,6 +382,10 @@ internal sealed class ConsoleLogWindow : Window, ILogWriter
 
     private bool FilterIsActive => !string.IsNullOrEmpty(_filterString);
     private const float LinePadding = 3;
+
+    /// <summary>Oldest lines are dropped past this; the console must not grow without bound in a long session.</summary>
+    private const int MaxRetainedEntries = 10000;
+
     private readonly List<ILogEntry> _logEntries = [];
     private bool _shouldScrollToBottom = true;
     private string _filterString = "";
