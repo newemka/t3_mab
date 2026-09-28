@@ -38,8 +38,11 @@ namespace Lib.geometry;
 /// divide exactly.</para>
 ///
 /// <para>All parts of one input count as that one solid, so multi-part geometry such as separated
-/// letters or fracture chunks needs no merge step. Solids are expected to be closed; the op warns when
-/// the result is not watertight.</para>
+/// letters or fracture chunks needs no merge step. That is right when the mesh declares its parts; a
+/// mesh that merely concatenates separated chunks without a part table is still one solid, and an
+/// intersection against it also cuts the space between the chunks. SplitOperandsIntoParts recovers
+/// the chunks from their connected shells for an intersection, which is the operation whose answer
+/// that changes. Solids are expected to be closed; the op warns when the result is not watertight.</para>
 /// </remarks>
 [Guid("3f9a1d64-7c25-4b8e-9a13-6e5d84c07b21")]
 internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressProvider
@@ -62,6 +65,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     {
         _operation = (Operations)Operation.GetValue(context).Clamp(0, 2);
         _splitIntoParts = SplitIntoParts.GetValue(context);
+        _splitOperands = SplitOperandsIntoParts.GetValue(context);
 
         var leftSource = Geometry.GetValue(context);
 
@@ -74,6 +78,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         var hash = new HashCode();
         hash.Add(_operation);
         hash.Add(_splitIntoParts);
+        hash.Add(_splitOperands);
         hash.Add(leftSource?.Version ?? 0);
         hash.Add(leftSource?.GetHashCode() ?? 0);
         for (var i = 0; i < rightSources.Length; i++)
@@ -100,11 +105,13 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
             var capturedRights = (MeshGeometry[])rightSources.Clone();
             var capturedOperation = _operation;
             var capturedSplit = _splitIntoParts;
+            var capturedSplitOperands = _splitOperands;
             var result = _asyncComputation.Update(context, Result, hash.ToHashCode(),
                                                   token =>
                                                   {
                                                       var target = new MeshGeometry();
-                                                      Evaluate(capturedLeft, capturedRights, capturedOperation, capturedSplit, target, token);
+                                                      Evaluate(capturedLeft, capturedRights, capturedOperation, capturedSplit, target,
+                                                               capturedSplitOperands, token);
                                                       return target;
                                                   });
             Result.Value = result ?? _output;
@@ -113,7 +120,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         }
 
         _asyncComputation.WaitForPending(Result);
-        Evaluate(leftSource, rightSources, _operation, _splitIntoParts, _output);
+        Evaluate(leftSource, rightSources, _operation, _splitIntoParts, _output, _splitOperands);
         Result.Value = _output;
         PartCount.Value = _output.Parts.Length;
     }
@@ -143,9 +150,16 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     /// operand carries a part table, its parts are separate solids rather than one lump: the branch
     /// splits into one per part, each cut on its own. Combining a fracture's cells as a lump would
     /// intersect against their union instead of against each cell.</para>
+    ///
+    /// <para>With <paramref name="splitOperands"/> an intersection still cuts a mesh that declares no
+    /// part table at its connected shells, so its chunks are separate solids too. Without it a mesh of
+    /// several disjoint shells is one solid, and an intersection against it is an intersection against
+    /// the space between the shells as well - its convex hull rather than its pieces, which shows up as
+    /// extra faces and non-manifold edges where two shells meet the same cutter.</para>
     /// </summary>
     internal static void Evaluate(MeshGeometry leftSource, IReadOnlyList<MeshGeometry> rightSources, Operations operation,
-                                  bool splitIntoParts, MeshGeometry target, CancellationToken cancellationToken = default)
+                                  bool splitIntoParts, MeshGeometry target, bool splitOperands = false,
+                                  CancellationToken cancellationToken = default)
     {
         var extent = ExtentOf(leftSource, rightSources);
 
@@ -161,62 +175,51 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
         // One branch is one evolving result solid. A single-part operand folds into every branch; a
         // multi-part operand fans each branch out into one branch per part.
-        var branches = new List<Branch> { new(Solid.Load(leftSource, schema, weld, 0, origin), 0) };
+        //
+        // Splitting operands at their shells is offered to Intersection only. It is the operation whose
+        // answer it corrects: a union or a difference of one multi-shell solid already names every
+        // shell in its result, so hull or pieces makes no difference to what is kept - but the hull can
+        // keep surfaces that a part-wise pass would drop, so switching it on there would move existing
+        // results rather than fix them.
+        var splitOperandsHere = splitOperands && operation == Operations.Intersection;
+        var leftParts = LoadOperandParts(leftSource, schema, weld, kernel, origin, 0, splitOperandsHere);
 
-        for (var i = 0; i < rightSources.Count; i++)
+        // The fold runs one left part at a time and drives that part through every operand before the
+        // next left part starts. Branching multiplies - a part-wide fan-out turns n parts into n
+        // branches per operand, and folding the product forward would hold every combination of every
+        // operand live at once, which is what floods memory on a 64-part operand. Driving one branch
+        // all the way through keeps only that branch's expansions live, so peak polygons scale with
+        // one part rather than with the product.
+        var results = new List<Branch>();
+        var budgetExceeded = false;
+        for (var p = 0; p < leftParts.Count; p++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var right = rightSources[i];
-            if (right == null || right.FaceCount == 0)
-                continue;
-
-            var partCount = right.Parts.Length > 0 ? right.Parts.Length : 1;
-            if (partCount == 1)
+            var folded = FoldOperands(new Branch(leftParts[p].Polygons, leftParts[p].Seed), rightSources, schema, weld, kernel,
+                                      origin, operation, splitOperandsHere, cancellationToken);
+            if (folded == null)
             {
-                var (faceStart, faceCount, _) = PartRange(right, 0);
-                var solid = Solid.Load(right, schema, weld, i + 1, origin, faceStart, faceCount);
-                if (solid.Count == 0)
-                    continue;
-
-                for (var b = 0; b < branches.Count; b++)
-                {
-                    var branch = branches[b];
-                    branch.Polygons = kernel.Combine(ClonePolygons(branch.Polygons), ClonePolygons(solid), operation);
-                }
-
-                continue;
+                budgetExceeded = true;
+                break;
             }
 
-            var fan = new List<Branch>(branches.Count * partCount);
-            for (var b = 0; b < branches.Count; b++)
-            {
-                var branch = branches[b];
-                for (var partIndex = 0; partIndex < partCount; partIndex++)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
+            results.AddRange(folded);
+        }
 
-                    var (faceStart, faceCount, seed) = PartRange(right, partIndex);
-                    var solid = Solid.Load(right, schema, weld, i + 1, origin, faceStart, faceCount);
-                    if (solid.Count == 0)
-                        continue;
-
-                    var result = kernel.Combine(ClonePolygons(branch.Polygons), solid, operation);
-                    if (result.Count == 0)
-                        continue;
-
-                    fan.Add(new Branch(result, seed));
-                }
-            }
-
-            branches = fan;
+        // An operation that ran out of budget has no answer to offer: emitting the branches built so
+        // far would present a truncated solid as the finished one.
+        if (budgetExceeded)
+        {
+            kernel.Emit(target, [], [], [], operation);
+            return;
         }
 
         var combined = new List<Polygon>();
         var components = new List<int>();
         var partSeeds = new List<int>();
 
-        foreach (var branch in branches)
+        foreach (var branch in results)
         {
             if (branch.Polygons.Count == 0)
                 continue;
@@ -270,6 +273,146 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
         var part = mesh.Parts[partIndex];
         return (part.FaceStart, part.FaceCount, part.SeedIndex);
+    }
+
+    /// <summary>One operand solid: its polygons, and the seed of the part it descends from.</summary>
+    private readonly record struct OperandPart(List<Polygon> Polygons, int Seed);
+
+    /// <summary>
+    /// Drives one starting branch through every right operand and returns the branches that survive,
+    /// or null when the fold hit the corner budget.
+    ///
+    /// <para>It walks a work list rather than a single branch so the fan-out of one operand is
+    /// expanded before the next operand is read: only one generation is ever live, instead of the
+    /// product of every operand's part count.</para>
+    /// </summary>
+    private static List<Branch>? FoldOperands(Branch start, IReadOnlyList<MeshGeometry> rightSources,
+                                              AttributeSchema schema, PointWeld weld, Kernel kernel, Vector3 origin,
+                                              Operations operation, bool splitOperands, CancellationToken cancellationToken)
+    {
+        var generation = new List<Branch> { start };
+        var expansion = new List<Branch>();
+
+        for (var i = 0; i < rightSources.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var right = rightSources[i];
+            if (right == null || right.FaceCount == 0)
+                continue;
+
+            // A right operand that declares no parts is still one solid per connected shell when the
+            // caller asked for that, so a scattered operand cuts one piece at a time instead of being
+            // intersected against everything between its pieces.
+            var rightParts = LoadOperandParts(right, schema, weld, kernel, origin, i + 1, splitOperands);
+            if (rightParts.Count == 0)
+                continue;
+
+            if (rightParts.Count == 1)
+            {
+                var solid = rightParts[0].Polygons;
+                for (var b = 0; b < generation.Count; b++)
+                {
+                    var branch = generation[b];
+                    branch.Polygons = kernel.Combine(ClonePolygons(branch.Polygons), ClonePolygons(solid), operation);
+                }
+
+                continue;
+            }
+
+            expansion.Clear();
+            var live = 0;
+            for (var b = 0; b < generation.Count; b++)
+            {
+                var branch = generation[b];
+                for (var partIndex = 0; partIndex < rightParts.Count; partIndex++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var part = rightParts[partIndex];
+                    if (part.Polygons.Count == 0)
+                        continue;
+
+                    var result = kernel.Combine(ClonePolygons(branch.Polygons), ClonePolygons(part.Polygons), operation);
+                    if (result.Count == 0)
+                        continue;
+
+                    for (var polygon = 0; polygon < result.Count; polygon++)
+                        live += result[polygon].CornerCount;
+
+                    expansion.Add(new Branch(result, part.Seed));
+                }
+
+                // Parts multiply: every operand part fans every branch, so the live polygon set can
+                // grow by a factor per operand. Past the budget the fold stops; the caller drops the
+                // partial result rather than emit something that looks finished.
+                if (live > MaxLiveCorners)
+                {
+                    Log.Warning($"BooleanOperation: combining {rightParts.Count} operand parts with {generation.Count} "
+                                + $"branches exceeds the budget of {MaxLiveCorners:N0} live corners, so the operation was "
+                                + "stopped. Reduce the number of parts, or turn off SplitOperandsIntoParts.");
+                    return null;
+                }
+            }
+
+            // Both lists are local, so swapping them exchanges the values rather than the caller's
+            // references - the previous generation becomes the scratch to overwrite next time.
+            (generation, expansion) = (expansion, generation);
+            expansion.Clear();
+        }
+
+        return generation;
+    }
+
+    /// <summary>
+    /// Loads one operand as the solids the fold will treat separately.
+    ///
+    /// <para>A declared part table wins: its face ranges are the parts, and a mesh with a single part
+    /// is one solid. Without a table the mesh is one solid too, unless <paramref name="split"/> is set
+    /// - then it is cut at its connected shells, so chunks that were merely concatenated become
+    /// separate solids.</para>
+    /// </summary>
+    private static List<OperandPart> LoadOperandParts(MeshGeometry mesh, AttributeSchema schema, PointWeld weld, Kernel kernel,
+                                                      Vector3 origin, int operandIndex, bool split)
+    {
+        var result = new List<OperandPart>();
+
+        if (mesh.Parts.Length > 0)
+        {
+            for (var partIndex = 0; partIndex < mesh.Parts.Length; partIndex++)
+            {
+                var (faceStart, faceCount, seed) = PartRange(mesh, partIndex);
+                var polygons = Solid.Load(mesh, schema, weld, operandIndex, origin, faceStart, faceCount);
+                if (polygons.Count > 0)
+                    result.Add(new OperandPart(polygons, seed));
+            }
+
+            return result;
+        }
+
+        var whole = Solid.Load(mesh, schema, weld, operandIndex, origin);
+        if (whole.Count == 0)
+            return result;
+
+        if (!split)
+        {
+            result.Add(new OperandPart(whole, 0));
+            return result;
+        }
+
+        var chunks = kernel.SplitByComponent(whole);
+        if (chunks.Count <= 1)
+        {
+            result.Add(new OperandPart(whole, 0));
+            return result;
+        }
+
+        // A shell keeps its position in the list as its seed, so an output part can still be traced
+        // back to the chunk it came from.
+        for (var chunkIndex = 0; chunkIndex < chunks.Count; chunkIndex++)
+            result.Add(new OperandPart(chunks[chunkIndex], chunkIndex));
+
+        return result;
     }
 
     /// <summary>An evolving result solid and the operand part it descends from.</summary>
@@ -374,6 +517,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
     private MeshGeometry[] _operandValues = [];
     private Operations _operation;
     private bool _splitIntoParts;
+    private bool _splitOperands;
 
     [Input(Guid = "1a7c5e20-9b34-4d61-8f52-70c3e1a8d946")]
     public readonly InputSlot<MeshGeometry> Geometry = new();
@@ -386,6 +530,9 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
     [Input(Guid = "9e14f7b6-8a02-4d53-b0c9-47e2a5b1c803")]
     public readonly InputSlot<bool> SplitIntoParts = new();
+
+    [Input(Guid = "d41a8c26-5f93-4e70-b2a8-6c17e0d94b53")]
+    public readonly InputSlot<bool> SplitOperandsIntoParts = new();
 
     [Input(Guid = "2b96c4d8-51e3-4f27-a6b0-83d1e95c7a46")]
     public readonly InputSlot<bool> Async = new();
@@ -1695,11 +1842,76 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         private readonly record struct EdgeHit(float T, Vert Vertex);
 
         /// <summary>
+        /// Cuts a polygon list into one list per connected shell, in a deterministic order. Returns a
+        /// single chunk when the input is already one shell, so callers can treat "no split happened"
+        /// and "one solid" the same way.
+        /// </summary>
+        public List<List<Polygon>> SplitByComponent(List<Polygon> polygons)
+        {
+            var chunks = new List<List<Polygon>>();
+            var components = ComponentsOf(polygons, _order, _byRoot);
+            if (components.Length == 0)
+                return chunks;
+
+            for (var c = 0; c < components.Length; c++)
+            {
+                var component = components[c];
+                while (chunks.Count <= component)
+                    chunks.Add([]);
+
+                chunks[component].Add(polygons[c]);
+            }
+
+            return chunks;
+        }
+
+        /// <summary>
         /// Groups polygons into connected shells and reorders the list so each shell is contiguous, as
         /// <see cref="GeometryPart"/> describes a part as a face range. Returns the component index of
         /// every polygon; empty when the result is empty.
         /// </summary>
         public int[] OrderByComponent(List<Polygon> polygons)
+        {
+            var count = polygons.Count;
+            if (count == 0)
+                return [];
+
+            _order.Clear();
+            _byRoot.Clear();
+            var components = ComponentsOf(polygons, _order, _byRoot);
+
+            _reordered.Clear();
+            _components.Clear();
+            var component = 0;
+            foreach (var root in _order)
+            {
+                foreach (var polygonIndex in _byRoot[root])
+                {
+                    _reordered.Add(polygons[polygonIndex]);
+                    _components.Add(component);
+                }
+
+                component++;
+            }
+
+            polygons.Clear();
+            polygons.AddRange(_reordered);
+
+            // Indexed like the reordered list, which is what the emitter walks.
+            return _components.ToArray();
+        }
+
+        /// <summary>
+        /// The connected shells of a polygon list, by shared welded edges. Two polygons are in one
+        /// shell when they share an edge, so separate chunks of one mesh come out as separate
+        /// components and a single closed hull comes out as one.
+        ///
+        /// <para>This is the same grouping <see cref="OrderByComponent"/> uses on a result; it is
+        /// exposed separately because an <em>operand</em> needs it too, to recover the parts a mesh
+        /// did not declare in its part table. The caller supplies the two grouping maps so a hot
+        /// loop can reuse them instead of allocating per call.</para>
+        /// </summary>
+        public int[] ComponentsOf(List<Polygon> polygons, List<int> rootOrder, Dictionary<int, List<int>> byRoot)
         {
             var count = polygons.Count;
             if (count == 0)
@@ -1730,40 +1942,26 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
                 }
             }
 
-            _order.Clear();
-            _byRoot.Clear();
+            rootOrder.Clear();
+            byRoot.Clear();
+            _componentOfRoot.Clear();
+            var components = new int[count];
             for (var i = 0; i < count; i++)
             {
                 var root = Find(parent, i);
-                if (!_byRoot.TryGetValue(root, out var group))
+                if (!_componentOfRoot.TryGetValue(root, out var component))
                 {
-                    group = [];
-                    _byRoot[root] = group;
-                    _order.Add(root);
+                    component = rootOrder.Count;
+                    rootOrder.Add(root);
+                    byRoot[root] = [];
+                    _componentOfRoot[root] = component;
                 }
 
-                group.Add(i);
+                byRoot[root].Add(i);
+                components[i] = component;
             }
 
-            _reordered.Clear();
-            _components.Clear();
-            var component = 0;
-            foreach (var root in _order)
-            {
-                foreach (var polygonIndex in _byRoot[root])
-                {
-                    _reordered.Add(polygons[polygonIndex]);
-                    _components.Add(component);
-                }
-
-                component++;
-            }
-
-            polygons.Clear();
-            polygons.AddRange(_reordered);
-
-            // Indexed like the reordered list, which is what the emitter walks.
-            return _components.ToArray();
+            return components;
         }
 
         /// <summary>
@@ -2006,6 +2204,7 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
         private readonly List<Polygon> _reordered = [];
         private readonly List<int> _components = [];
         private readonly Dictionary<(int, int), int> _edgeOwner = [];
+        private readonly Dictionary<int, int> _componentOfRoot = [];
         private readonly Dictionary<int, List<int>> _byRoot = [];
         private readonly List<int> _order = [];
     }
@@ -2043,4 +2242,12 @@ internal sealed class BooleanOperation : Instance<BooleanOperation>, IProgressPr
 
     /// <summary>Cap on the samples taken along one edge while looking for points lying on it.</summary>
     private const int MaxEdgeSamples = 8192;
+
+    /// <summary>
+    /// Corner budget for the fold. Each operand part fans every branch, so the live polygon set grows
+    /// by a factor per operand and a many-part operand multiplies out quickly. This is a backstop
+    /// against exhausting memory on a pathological composition, not a tuning knob: it sits far above
+    /// any result that would be useful to draw, so reaching it means the arrangement is wrong.
+    /// </summary>
+    private const int MaxLiveCorners = 20_000_000;
 }
