@@ -17,7 +17,11 @@ internal sealed class SrvFromTexture2d : Instance<SrvFromTexture2d>
 
     private void Update(EvaluationContext context)
     {
-        
+        // Context-dependent: [SetContextTexture] publishes its texture around a subtree, so the resource that is
+        // current for *this* draw can differ from the one this input slot cached at the start of the frame.
+        // The draw stage refreshes the sources it binds; re-read the texture here instead of trusting that cache.
+        Texture.DirtyFlag.ForceInvalidate();
+
         var texture = Texture.GetValue(context);
         if (texture != null && ShaderResourceView.Value != null && texture.GetHashCode() == _textureHash)
             return;

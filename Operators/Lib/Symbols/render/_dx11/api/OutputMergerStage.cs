@@ -25,6 +25,20 @@ internal sealed class OutputMergerStage : Instance<OutputMergerStage> {
         BlendSampleMask.GetValue(context);
         
         // GET DSV, RTV and UAVs from context
+        // Re-read them for this pass: a context texture (e.g. the shadow map [SetContextTexture] publishes around
+        // its subtree) can be swapped between two draws of the same frame, while value slots are cached per frame.
+        DepthStencilView.DirtyFlag.ForceInvalidate();
+        if (DepthStencilView.TryGetFirstConnection(out var dsvSource))
+        {
+            dsvSource.DirtyFlag.ForceInvalidate();
+        }
+
+        var rtvSources = RenderTargetViews.GetCollectedTypedInputs(true);
+        for (var i = 0; i < rtvSources.Count; i++)
+        {
+            rtvSources[i].DirtyFlag.ForceInvalidate();
+        }
+
         _depthStencilView= DepthStencilView.GetValue(context);
         RenderTargetViews.GetValues(ref _renderTargetViews, context);
         UnorderedAccessViews.GetValues(ref _unorderedAccessViews, context);

@@ -16,8 +16,15 @@ internal sealed class RtvFromTexture2d : Instance<RtvFromTexture2d>, IStatusProv
 
     private void Update(EvaluationContext context)
     {
-        if (!Texture.DirtyFlag.IsDirty && !ArrayIndex.DirtyFlag.IsDirty)
-            return; // nothing to do
+        // Re-read the texture for this draw: a context texture can be swapped between two draws of the same frame
+        // (e.g. the shadow map that [SetContextTexture] publishes around its subtree), while input slots are served
+        // from the per-frame cache. The view is rebuilt only when the resource actually changed.
+        Texture.DirtyFlag.ForceInvalidate();
+        var texture = Texture.GetValue(context);
+        if (texture == _texture && RenderTargetView.Value != null && !RenderTargetView.Value.IsDisposed)
+            return;
+
+        _texture = texture;
 
         var arrayIndex = ArrayIndex.GetValue(context).Clamp(0,10000);
 
@@ -25,7 +32,6 @@ internal sealed class RtvFromTexture2d : Instance<RtvFromTexture2d>, IStatusProv
         {
             _lastErrorMessage = null;
 
-            Texture2D texture = Texture.GetValue(context);
             if (texture != null)
             {
                 var maxArraySize = texture.Description.ArraySize;
@@ -100,6 +106,7 @@ internal sealed class RtvFromTexture2d : Instance<RtvFromTexture2d>, IStatusProv
     public readonly InputSlot<int> ArrayIndex = new();
 
     private string _lastErrorMessage = null;
+    private Texture2D _texture;
         
     public IStatusProvider.StatusLevel GetStatusLevel()
     {

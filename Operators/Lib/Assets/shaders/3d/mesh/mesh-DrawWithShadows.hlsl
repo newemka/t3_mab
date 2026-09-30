@@ -285,8 +285,8 @@ float4 psMain(psInput pin) : SV_TARGET
     // Spotlight cone effect 
     // TODO: allow to use a texture instead
     float coneSize = Lights[0].range;
-    float d = length((float2(0.5,0.5)- shadowCoord.xy)/.25);
-    float cone = 1.0 - smoothstep(0.8, 1.0, d);
+    float d = length((float2(0.5,0.5)- shadowCoord.xy)/.50);
+    float cone = 1.0 - smoothstep(0.9, 1.0, d);
 
     // Final fragment color.
     float4 litColor = float4(directLighting + ambientLighting, 1.0) * BaseColor * Color;

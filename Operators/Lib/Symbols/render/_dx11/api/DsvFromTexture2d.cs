@@ -15,13 +15,19 @@ public class DsvFromTexture2d : Instance<DsvFromTexture2d>
 
     private void Update(EvaluationContext context)
     {
-        if (!Texture.DirtyFlag.IsDirty)
-            return; // nothing to do
+        // Re-read the texture for this pass: a context texture can be swapped between two passes of the same frame
+        // (e.g. the shadow map that [SetContextTexture] publishes around its subtree), while input slots are served
+        // from the per-frame cache. The view is rebuilt only when the resource actually changed.
+        Texture.DirtyFlag.ForceInvalidate();
+        var texture = Texture.GetValue(context);
+        if (texture == _texture && _depthBufferDsv != null && !_depthBufferDsv.IsDisposed)
+            return;
+
+        _texture = texture;
 
         try
         {
             var device = ResourceManager.Device;
-            Texture2D texture = Texture.GetValue(context);
             if (texture != null)
             {
                 _depthBufferDsv = new DepthStencilView(device,
@@ -45,4 +51,5 @@ public class DsvFromTexture2d : Instance<DsvFromTexture2d>
     public readonly InputSlot<Texture2D> Texture = new();
 
     private DepthStencilView _depthBufferDsv;
+    private Texture2D _texture;
 }

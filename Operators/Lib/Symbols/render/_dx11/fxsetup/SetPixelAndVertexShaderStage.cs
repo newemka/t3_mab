@@ -20,6 +20,22 @@ internal sealed class SetPixelAndVertexShaderStage : Instance<SetPixelAndVertexS
         var psStage = deviceContext.PixelShader;
 
         
+        // Context textures and per-pass flags can change between two draws within the same frame (e.g. the shadow
+        // map that [SetContextTexture] publishes around its subtree), while value slots are otherwise served from
+        // the per-frame cache. Re-reading the connected sources keeps this draw bound to the state that is current
+        // for *this* draw, without marking any operator as animated — so idle mode is preserved.
+        var bufferSources = ConstantBuffers.GetCollectedTypedInputs(true);
+        for (var i = 0; i < bufferSources.Count; i++)
+        {
+            bufferSources[i].DirtyFlag.ForceInvalidate();
+        }
+
+        var srvSources = ShaderResources.GetCollectedTypedInputs(true);
+        for (var i = 0; i < srvSources.Count; i++)
+        {
+            srvSources[i].DirtyFlag.ForceInvalidate();
+        }
+
         ConstantBuffers.GetValues(ref _constantBuffers, context);
         ShaderResources.GetValues(ref _shaderResourceViews, context);
         SamplerStates.GetValues(ref _samplerStates, context);

@@ -34,8 +34,8 @@ internal sealed class Ease : Instance<Ease>
 
         _lastEvalTime = currentTime;
 
-        if (context.IntVariables.TryGetValue("__MotionBlurPass", out var motionBlurPass) && motionBlurPass > 0)
-            return;
+        //if (context.IntVariables.TryGetValue("__MotionBlurPass", out var motionBlurPass) && motionBlurPass > 0)
+            //return;
 
         // Check if input has changed to trigger new animation
         if (Math.Abs(inputValue - _previousInputValue) > 0.001f)

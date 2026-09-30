@@ -19,6 +19,20 @@ internal sealed class ClearRenderTarget : Instance<ClearRenderTarget>
         var device = ResourceManager.Device;
         var deviceContext = device.ImmediateContext;
         // deviceContext.Draw2(VertexCount.GetValue(context), VertexStartLocation.GetValue(context));
+        // Re-read the targets for this pass: they can be swapped between two draws of the same frame (e.g. the
+        // shadow map that [SetContextTexture] publishes around its subtree) while value slots are cached per frame.
+        RenderTarget.DirtyFlag.ForceInvalidate();
+        if (RenderTarget.TryGetFirstConnection(out var rtvSource))
+        {
+            rtvSource.DirtyFlag.ForceInvalidate();
+        }
+
+        DepthStencilView.DirtyFlag.ForceInvalidate();
+        if (DepthStencilView.TryGetFirstConnection(out var dsvSource))
+        {
+            dsvSource.DirtyFlag.ForceInvalidate();
+        }
+
         var rtv = RenderTarget.GetValue(context);
         if (rtv != null)
         {
