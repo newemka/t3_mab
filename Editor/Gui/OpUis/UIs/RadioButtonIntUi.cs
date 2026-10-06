@@ -9,7 +9,7 @@ using Vector2 = System.Numerics.Vector2;
 
 namespace T3.Editor.Gui.OpUis.UIs;
 
-internal static class DirectIntValueUi
+internal static class RadioButtonIntUi
 {
     private const int MaxCols = 8;
     private const int MaxRows = 2;
@@ -61,6 +61,9 @@ internal static class DirectIntValueUi
                         ? data.Int.Value
                         : data.Int.TypedInputValue.Value;
 
+        if (showButtons)
+            DrawNameAbove(instance, drawList, selectableScreenRect);
+
         ImGui.PushClipRect(selectableScreenRect.Min, selectableScreenRect.Max, true);
 
         if (showButtons)
@@ -97,7 +100,7 @@ internal static class DirectIntValueUi
             return;
 
         var buttonSize = new Vector2(buttonW, buttonH);
-        var font = buttonH > 40 ? Fonts.FontLarge : (buttonH > 22 ? Fonts.FontNormal : Fonts.FontSmall);
+        var font = buttonH > 40 ? Fonts.FontLarge : (buttonH > 20 ? Fonts.FontNormal : Fonts.FontSmall);
 
         ImGui.PushFont(font);
         ImGui.PushID(instance.SymbolChildId.GetHashCode());
@@ -149,6 +152,19 @@ internal static class DirectIntValueUi
 
         ImGui.TextUnformatted($"{value:0}");
         ImGui.EndGroup();
+        ImGui.PopFont();
+    }
+
+    private static void DrawNameAbove(Instance instance, ImDrawListPtr drawList, ImRect rect)
+    {
+        var name = instance.SymbolChild.Name;
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        ImGui.PushFont(Fonts.FontSmall);
+        var textSize = ImGui.CalcTextSize(name);
+        var pos = new Vector2(rect.Min.X + 2, rect.Min.Y - textSize.Y - 2);
+        drawList.AddText(pos, UiColors.Text, name);
         ImGui.PopFont();
     }
 

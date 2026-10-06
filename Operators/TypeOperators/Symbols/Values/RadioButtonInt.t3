@@ -1,0 +1,19 @@
+{
+  "FormatVersion": 3,
+  "Id": "5503faad-b025-4d71-9dff-a5476c282a4f"/*RadioButtonInt*/,
+  "Inputs": [
+    {
+      "Id": "2d0e4b7d-3e27-4b1b-8f95-5b4625174f93"/*Int*/,
+      "DefaultValue": 0
+    },
+    {
+      "Id": "50fd8244-7d0d-4d14-91e5-0eada9968b44"/*ColsRows*/,
+      "DefaultValue": {
+        "X": 0,
+        "Y": 0
+      }
+    }
+  ],
+  "Children": [],
+  "Connections": []
+}

@@ -1,12 +1,12 @@
 namespace Types.Values;
 
 [Guid("5503faad-b025-4d71-9dff-a5476c282a4f")]
-public sealed class DirectIntValue :Instance<DirectIntValue>,IExtractedInput<int>
+public sealed class RadioButtonInt :Instance<RadioButtonInt>,IExtractedInput<int>
 {
     [Output(Guid = "4e4e3f6f-33aa-43ba-b45c-2be56a2cc91f")]
     public readonly Slot<int> Result = new();
 
-    public DirectIntValue()
+    public RadioButtonInt()
     {
         Result.UpdateAction += Update;
     }

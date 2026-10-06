@@ -86,7 +86,7 @@ public static class OpUi
                   { Guid.Parse("5880cbc3-a541-4484-a06a-0e6f77cdbe8e"), StringUi.DrawChildUi },
                   { Guid.Parse("5d7d61ae-0a41-4ffa-a51d-93bab665e7fe"), ValueUi.DrawChildUi },
                   { Guid.Parse("cc07b314-4582-4c2c-84b8-bb32f59fc09b"), IntValueUi.DrawChildUi },
-                  { Guid.Parse("5503faad-b025-4d71-9dff-a5476c282a4f"), DirectIntValueUi.DrawChildUi },
+                  { Guid.Parse("5503faad-b025-4d71-9dff-a5476c282a4f"), RadioButtonIntUi.DrawChildUi },
                   { Guid.Parse("f0acd1a4-7a98-43ab-a807-6d1bd3e92169"), RemapUi.DrawChildUi },
                   
                   { Guid.Parse("ea7b8491-2f8e-4add-b0b1-fd068ccfed0d"), AnimValueUi.DrawChildUi },

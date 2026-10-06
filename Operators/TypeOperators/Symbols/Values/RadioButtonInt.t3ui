@@ -1,6 +1,6 @@
 {
   "FormatVersion": 3,
-  "Id": "5503faad-b025-4d71-9dff-a5476c282a4f"/*DirectIntValue*/,
+  "Id": "5503faad-b025-4d71-9dff-a5476c282a4f"/*RadioButtonInt*/,
   "Description": "GUI int value allows to click directly the value you like. \nHelpful to define or animate settings of one or multiple nodes.\n\nCan be combined with [IntToFloat], [MultiplyInt], [ClampInt], and many other Math Operators to create complex and helpful control setups and combinations.",
   "InputUis": [
     {
@@ -8,6 +8,14 @@
       "Position": {
         "X": -200.0,
         "Y": 0.0
+      }
+    },
+    {
+      "InputId": "50fd8244-7d0d-4d14-91e5-0eada9968b44"/*ColsRows*/,
+      "Relevancy": "Required",
+      "Position": {
+        "X": -200.0,
+        "Y": 75.0
       }
     }
   ],
