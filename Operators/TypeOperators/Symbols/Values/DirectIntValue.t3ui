@@ -1,0 +1,24 @@
+{
+  "FormatVersion": 3,
+  "Id": "5503faad-b025-4d71-9dff-a5476c282a4f"/*DirectIntValue*/,
+  "Description": "GUI int value allows to click directly the value you like. \nHelpful to define or animate settings of one or multiple nodes.\n\nCan be combined with [IntToFloat], [MultiplyInt], [ClampInt], and many other Math Operators to create complex and helpful control setups and combinations.",
+  "InputUis": [
+    {
+      "InputId": "2d0e4b7d-3e27-4b1b-8f95-5b4625174f93"/*Int*/,
+      "Position": {
+        "X": -200.0,
+        "Y": 0.0
+      }
+    }
+  ],
+  "SymbolChildUis": [],
+  "OutputUis": [
+    {
+      "OutputId": "4e4e3f6f-33aa-43ba-b45c-2be56a2cc91f"/*Result*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 0.0
+      }
+    }
+  ]
+}
