@@ -14,7 +14,6 @@ public sealed class DirectIntValue :Instance<DirectIntValue>,IExtractedInput<int
     private void Update(EvaluationContext context)
     {
         Result.Value = Int.GetValue(context);
-
     }
         
 

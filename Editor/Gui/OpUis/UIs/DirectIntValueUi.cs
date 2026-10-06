@@ -118,7 +118,7 @@ internal static class DirectIntValueUi
 
                 if (ImGui.Button(_buttonLabels[index], buttonSize))
                 {
-                    SetValue(instance, data, index);
+                    SetValue(data, index);
                 }
 
                 if (isSelected)
@@ -152,13 +152,10 @@ internal static class DirectIntValueUi
         ImGui.PopFont();
     }
 
-    private static void SetValue(Instance instance, Binding data, int newValue)
+    private static void SetValue(Binding data, int newValue)
     {
-        // User-triggered, so allocations are fine here.
         data.Int.TypedInputValue.Value = newValue;
         data.Int.Input.IsDefault = false;
         data.Int.DirtyFlag.ForceInvalidate();
-        // TODO: route through the undo system (ChangeInputValueCommand or whatever
-        // the other op UIs use) so clicks are undoable and the symbol is marked modified.
     }
 }
