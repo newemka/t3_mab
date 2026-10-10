@@ -16,7 +16,12 @@
       "Position": {
         "X": -200.0,
         "Y": 75.0
-      }
+      },
+      "Min": 1,
+      "Max": 8,
+      "Scale": 1.0,
+      "ClampMin": true,
+      "ClampMax": true
     }
   ],
   "SymbolChildUis": [],
