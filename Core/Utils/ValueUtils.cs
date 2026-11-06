@@ -478,8 +478,8 @@ public static class ValueUtils
                        InputValue<int> i      => $"{i.Value:G3}",
                        InputValue<Int3> i     => $"{i.Value:G3}",
                        InputValue<bool> b     => $"{b.Value}",
-                       InputValue<Vector3> v3 => $"{v3.Value:0.0}",
-                       InputValue<Vector2> v2 => $"{v2.Value:0.0}",
+                       InputValue<Vector3> v3 => FormatVector3(v3.Value),
+                       InputValue<Vector2> v2 => FormatVector2(v2.Value),
                        InputValue<string> s   => s.Value.Truncate(),
                        _                      => ""
                    };
@@ -494,8 +494,8 @@ public static class ValueUtils
                        InputSlot<int> i                      => $"{i.GetCurrentValue():G3}",
                        InputSlot<Int3> i                     => $"{i.GetCurrentValue():G3}",
                        InputSlot<bool> b                     => $"{b.GetCurrentValue()}",
-                       InputSlot<System.Numerics.Vector3> v3 => $"{v3.GetCurrentValue():0.0}",
-                       InputSlot<System.Numerics.Vector2> v2 => $"{v2.GetCurrentValue():0.0}",
+                       InputSlot<System.Numerics.Vector3> v3 => FormatVector3(v3.GetCurrentValue()),
+                       InputSlot<System.Numerics.Vector2> v2 => FormatVector2(v2.GetCurrentValue()),
                        InputSlot<string> s                   => s.GetCurrentValue().Truncate(),
                        _                                     => ""
                    };
@@ -510,10 +510,18 @@ public static class ValueUtils
                        Slot<int> i                      => $"{i.Value:G3}",
                        Slot<Int3> i                     => $"{i.Value:G3}",
                        Slot<bool> b                     => $"{b.Value}",
-                       Slot<System.Numerics.Vector3> v3 => $"{v3.Value:0.0}",
-                       Slot<System.Numerics.Vector2> v2 => $"{v2.Value:0.0}",
+                       Slot<System.Numerics.Vector3> v3 => FormatVector3(v3.Value),
+                       Slot<System.Numerics.Vector2> v2 => FormatVector2(v2.Value),
                        Slot<string> s                   => s.Value.Truncate(),
                        _                                     => ""
                    };
     }
+
+    /// <summary>
+    /// Formats vector components explicitly. Neither <see cref="Vector2"/> nor <see cref="Vector3"/> can be
+    /// interpolated with a format specifier, because their ToString(format) wraps the result in "&lt;" and "&gt;".
+    /// </summary>
+    private static string FormatVector2(Vector2 v) => $"{v.X:0.0}, {v.Y:0.0}";
+
+    private static string FormatVector3(Vector3 v) => $"{v.X:0.0}, {v.Y:0.0}, {v.Z:0.0}";
 }
