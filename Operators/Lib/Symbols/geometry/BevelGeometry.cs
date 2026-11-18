@@ -14,6 +14,14 @@ namespace Lib.geometry;
 [Guid("dbaeebea-8d46-416f-9624-867af10d9c07")]
 internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
 {
+    /// <summary>Both texture coordinate channels of a point, carried and interpolated together.</summary>
+    private readonly record struct UvPair(Vector2 TexCoord, Vector2 TexCoord2)
+    {
+        public static UvPair Lerp(in UvPair a, in UvPair b, float t)
+            => new(Vector2.Lerp(a.TexCoord, b.TexCoord, t),
+                   Vector2.Lerp(a.TexCoord2, b.TexCoord2, t));
+    }
+
     [Output(Guid = "48342188-0139-4ea4-943d-a5b5d59b7a4a")]
     public readonly Slot<MeshGeometry> Result = new();
 
@@ -80,8 +88,18 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         var cornerPoints = source.CornerPointIndices;
         var edges = source.Edges;
 
+        // Input UVs are per corner; every point the bevel adds belongs to one face
+        // context, so they can be carried per output point and read back per corner.
+        _hasTexCoords = source.Attributes.TryGet<Vector2>(GeometryAttributeNames.TexCoord, AttributeDomain.Corner, out var sourceTexCoords)
+                        && sourceTexCoords.Count == source.CornerCount;
+        _sourceTexCoords = _hasTexCoords ? sourceTexCoords.Values : [];
+        _hasTexCoords2 = source.Attributes.TryGet<Vector2>(GeometryAttributeNames.TexCoord2, AttributeDomain.Corner, out var sourceTexCoords2)
+                         && sourceTexCoords2.Count == source.CornerCount;
+        _sourceTexCoords2 = _hasTexCoords2 ? sourceTexCoords2.Values : [];
+
         _outPositions.Clear();
         _outNormals.Clear();
+        _outUvs.Clear();
         _outFaceOffsets.Clear();
         _outCorners.Clear();
         _outFaceOffsets.Add(0);
@@ -130,7 +148,9 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
                 var bisectorLength = bisector.Length();
                 var inward = bisectorLength > 1e-6f ? bisector / bisectorLength : Vector3.Zero;
 
-                insetPointIds[c] = AddPoint(p + inward * (width / sinHalf), _faceNormals[faceIndex]);
+                // Keep the inset face's UV island exactly: the corner UV is copied, so
+                // the texture on the shrunk face stays continuous with its bevel strip.
+                insetPointIds[c] = AddPoint(p + inward * (width / sinHalf), _faceNormals[faceIndex], GetCornerUv(c));
             }
         }
 
@@ -193,6 +213,25 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
                 normals.Values[c] = _outNormals[_outCorners[c]];
             }
         }
+
+        if (_hasTexCoords)
+        {
+            var texCoords = target.Attributes.GetOrCreate<Vector2>(GeometryAttributeNames.TexCoord, AttributeDomain.Corner, _outCorners.Count);
+            for (var c = 0; c < _outCorners.Count; c++)
+            {
+                texCoords.Values[c] = _outUvs[_outCorners[c]].TexCoord;
+            }
+        }
+
+        if (_hasTexCoords2)
+        {
+            var texCoords2 = target.Attributes.GetOrCreate<Vector2>(GeometryAttributeNames.TexCoord2, AttributeDomain.Corner, _outCorners.Count);
+            for (var c = 0; c < _outCorners.Count; c++)
+            {
+                texCoords2.Values[c] = _outUvs[_outCorners[c]].TexCoord2;
+            }
+        }
+
         target.InvalidateTopologyCaches();
     }
 
@@ -209,6 +248,8 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         var q1Id = _insetPointIds[FindCornerInFace(source, edge.Face1, endPointId)];
         var q0 = _outPositions[q0Id];
         var q1 = _outPositions[q1Id];
+        var uv0 = _outUvs[q0Id];
+        var uv1 = _outUvs[q1Id];
 
         // Control point: the original edge, inset along its own direction - the profile
         // bends around it. Projection of the midpoint onto the edge line.
@@ -233,7 +274,9 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
             var curved = Vector3.Lerp(curvedA, curvedB, f);
             var blended = Vector3.Lerp(n0, n1, f);
             var normal = blended.LengthSquared() > 1e-10f ? Vector3.Normalize(blended) : n0;
-            ring[s] = AddPoint(Vector3.Lerp(straight, curved, roundness), normal);
+            // Across a UV seam the strip blends the two islands - the usual bevel
+            // compromise; on a smooth surface the UVs match and the blend is invisible.
+            ring[s] = AddPoint(Vector3.Lerp(straight, curved, roundness), normal, UvPair.Lerp(uv0, uv1, f));
         }
 
         edgeRings.Add(key, ring);
@@ -297,12 +340,17 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
             // patch bulges outward (the centroid itself lies inside the rounded corner).
             var vertex = source.Positions[pointId];
             var centroid = Vector3.Zero;
+            var uvSum = Vector2.Zero;
+            var uv2Sum = Vector2.Zero;
             foreach (var id in loop)
             {
                 centroid += _outPositions[id];
+                uvSum += _outUvs[id].TexCoord;
+                uv2Sum += _outUvs[id].TexCoord2;
             }
 
             centroid /= loop.Count;
+            var centerUv = new UvPair(uvSum / loop.Count, uv2Sum / loop.Count);
 
             // The face walk can go either way around the vertex - orient the loop so its
             // polygon normal (Newell) points outward, along vertex-minus-centroid.
@@ -325,7 +373,7 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
             if (!roundCorners || segments == 1)
             {
                 var bulge = 1f - 0.25f * roundness;
-                var centerId = AddPoint(vertex + (centroid - vertex) * bulge, centerNormal);
+                var centerId = AddPoint(vertex + (centroid - vertex) * bulge, centerNormal, centerUv);
 
                 for (var i = 0; i < loop.Count; i++)
                 {
@@ -383,8 +431,20 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         if (d > 0)
             radius = MathF.Min(radius, d);
 
+        // The corner's UVs collapse toward the average of the loop, matching how the
+        // geometry converges on the pole - no single source island wins at a corner.
+        var uvSum = Vector2.Zero;
+        var uv2Sum = Vector2.Zero;
+        foreach (var id in loop)
+        {
+            uvSum += _outUvs[id].TexCoord;
+            uv2Sum += _outUvs[id].TexCoord2;
+        }
+
+        var poleUv = new UvPair(uvSum / n, uv2Sum / n);
+
         var pole = center + outwardNormal * radius;
-        var poleId = AddPoint(Vector3.Lerp(vertex, pole, roundness), outwardNormal);
+        var poleId = AddPoint(Vector3.Lerp(vertex, pole, roundness), outwardNormal, poleUv);
 
         // Rings between the loop (t=0) and the pole (t=1): planar shrink toward the
         // pole, pushed out to the sphere by roundness.
@@ -409,7 +469,7 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
                 var normal = Vector3.Lerp(flatNormal, sphereNormal, roundness);
                 if (normal.LengthSquared() > 1e-10f)
                     normal = Vector3.Normalize(normal);
-                currentRing[i] = AddPoint(position, normal);
+                currentRing[i] = AddPoint(position, normal, UvPair.Lerp(_outUvs[loop[i]], poleUv, t));
             }
 
             for (var i = 0; i < n; i++)
@@ -483,12 +543,18 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         return false;
     }
 
-    private int AddPoint(Vector3 position, Vector3 normal)
+    private int AddPoint(Vector3 position, Vector3 normal, UvPair uv)
     {
         _outPositions.Add(position);
         _outNormals.Add(normal);
+        _outUvs.Add(uv);
         return _outPositions.Count - 1;
     }
+
+    /// <summary>UVs of one source corner, safe to call when the input has no UV attribute.</summary>
+    private UvPair GetCornerUv(int corner)
+        => new(_hasTexCoords ? _sourceTexCoords[corner] : Vector2.Zero,
+               _hasTexCoords2 ? _sourceTexCoords2[corner] : Vector2.Zero);
 
     private void AddQuad(int a, int b, int c, int d)
     {
@@ -513,10 +579,15 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
     private readonly AsyncComputation<MeshGeometry> _asyncComputation = new();
     private readonly List<Vector3> _outPositions = [];
     private readonly List<Vector3> _outNormals = [];
+    private readonly List<UvPair> _outUvs = [];
     private readonly List<int> _outFaceOffsets = [];
     private readonly List<int> _outCorners = [];
     private int[] _insetPointIds = [];
     private Vector3[] _faceNormals = [];
+    private Vector2[] _sourceTexCoords = [];
+    private Vector2[] _sourceTexCoords2 = [];
+    private bool _hasTexCoords;
+    private bool _hasTexCoords2;
 
     [Input(Guid = "46a2c9e2-7b5d-45ce-9955-b1c0b1bb01db")]
     public readonly InputSlot<MeshGeometry> Geometry = new();

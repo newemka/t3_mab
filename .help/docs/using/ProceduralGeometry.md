@@ -39,7 +39,19 @@ Geometry becomes renderable through [GeometryToMesh], which triangulates the fac
 - **RoundCorners** — builds rounded patches at the corners instead of flat fans. Needs more than one segment.
 - **FlatShading** — by default bevels are smoothly shaded so the strips blend into the flat faces. Enable it for hard, faceted shading where every segment reads as its own plane.
 
+Textures survive beveling: corner UVs are carried through to the inset faces, and the edge strips and corner patches interpolate between the UVs of their adjacent faces. Across a UV seam the bevel band blends the two islands, which is the usual compromise without a dedicated unwrap.
+
 Animating **Width** is cheap on simple shapes — the geometry rebuilds in real time.
+
+## Unwrapping UVs
+
+[UnwrapGeometry] generates UVs for geometry that has none, or replaces an existing mapping with a packed atlas:
+
+```
+[CubeGeometry] -> [BevelGeometry] -> [UnwrapGeometry] -> [GeometryToMesh] -> [SetMaterial]
+```
+
+It grows charts from the largest faces while neighboring normals stay within **AngleThreshold**, unfolds each chart flat across its edges, and packs the islands into 0–1 at a uniform scale. 45–60° works well for beveled hard-surface models: faces and their bevel bands stay in one island, while hard edges split. **Padding** controls the gap between islands, and **ToTexCoord2** writes the result to the second UV channel while keeping the first. **Mode** selects the strategy: `Default` treats every face alike, while `Text` uses the `IsSide` attribute from [CurvesToGeometry] to split the UV space into three horizontal bands — back-facing caps on top, front-facing caps in the middle, and walls and bevels at the bottom. The cap groups keep their text layout, so the middle band reads like the original text while the top band shows it mirrored from behind. Each side loop is cut at a single edge and unrolled into a vertical stripe in the bottom band. Very curved charts can fold over themselves — lower the threshold to split them.
 
 ## Transforming and inspecting
 

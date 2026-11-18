@@ -42,6 +42,52 @@ Drag the `Width` parameter continuously between 0 and 0.3.
 - The bevel follows interactively at full frame rate.
 - The width stops growing when the automatic clamp kicks in; no self-intersections appear.
 
+## Step: Textures survive beveling
+
+**Action:**
+Build `[CubeGeometry]` -> `[BevelGeometry]` -> `[GeometryToMesh]`, draw it with
+`[DrawMesh]` wrapped in `[SetMaterial]` using an image from `[LoadImage]`, and
+feed the compiled mesh into `[VisualizeUvMap]` with the same image as **Texture**.
+
+**Expected:**
+- The image appears on every face and bevel band — no black or untextured bevels.
+- `[VisualizeUvMap]` shows the cube's six overlapping face islands plus the
+  bevel strips and corner patches; none of the bevel faces collapse to a point.
+
+## Step: Angle-based unwrap
+
+**Action:**
+Insert `[UnwrapGeometry]` between `[BevelGeometry]` and `[GeometryToMesh]`. Set
+**AngleThreshold** to 60 and **Padding** to 0.01, then apply a checker image
+through `[SetMaterial]`.
+
+**Expected:**
+- `[VisualizeUvMap]` shows six large islands — one per cube face including its
+  bevel band — plus no overlapping or flipped triangles.
+- The checker stays square on the flat faces and continues over the beveled
+  edges without holes or black patches.
+- Lowering **AngleThreshold** splits the islands into more, flatter pieces;
+  raising it merges them.
+- Enabling **ToTexCoord2** writes the new mapping to the second UV channel and
+  leaves the original **TexCoord** intact.
+
+## Step: Unwrapping 3D text
+
+**Action:**
+Build `[TextToCurves]` -> `[CurvesToGeometry]` -> `[UnwrapGeometry]` and set
+**Mode** to `Text`. Compile with `[GeometryToMesh]` and feed the result into
+`[VisualizeUvMap]` or a texture through `[SetMaterial]`.
+
+**Expected:**
+- The UV space is split into three horizontal bands: mirrored back caps on top,
+  upright front caps in the middle, and side stripes at the bottom.
+- The middle band reads like the original text, with the glyphs kept in their
+  original relative positions.
+- Each side loop is one vertical stripe with a single seam; no horizontal side
+  strips or multiple seam pieces.
+- Switching **Mode** back to `Default` tilts the glyphs according to each cap
+  chart's seed face and packs everything together.
+
 ## Step: Chamfer and flat shading
 
 **Action:**
