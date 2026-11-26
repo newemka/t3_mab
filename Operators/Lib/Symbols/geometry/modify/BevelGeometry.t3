@@ -7,6 +7,10 @@
       "DefaultValue": 1.0
     },
     {
+      "Id": "3ccbe233-5a23-46a1-b295-5ff44a3eb56b"/*EdgeSelection*/,
+      "DefaultValue": 0
+    },
+    {
       "Id": "3f8b1c4d-92e6-4a17-b5d0-6a4c8e2f7d19"/*RoundCorners*/,
       "DefaultValue": false
     },

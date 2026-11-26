@@ -62,6 +62,24 @@ Set `Segments` to 4 and `Roundness` to 1, then enable `RoundCorners`.
   continues through the corner in concentric rings.
 - No spikes at the corners, even when `Width` is dragged up to the clamp.
 
+## Step: Bevel only cap or wall edges
+
+**Action:**
+Connect `[NGonCurves]` -> `[Extrude]` -> `[BevelGeometry]` (a hexagonal prism) and set `Width` to 0.02.
+Switch `EdgeSelection` between All, CapEdges and WallEdges. Repeat on a shape with a hole (`[MergeCurves]`
+Xor), and try a `[CubeGeometry]` as input.
+
+**Expected:**
+- All bevels every edge, as before.
+- CapEdges rounds the cap rims (including hole rims) and leaves the vertical wall corners sharp. The caps
+  are inset and the walls keep their height.
+- WallEdges rounds only the vertical wall corners. The caps are cut back at those corners, so the bevel ends
+  flush and the prism stays watertight (0 boundary edges).
+- A `[CubeGeometry]` has no IsSide attribute: the parameter reports “No IsSide attribute; beveling all edges.”
+  and behaves like All.
+- Straight Skeleton with a selection reports that it uses the Fast method.
+- A bridged cap with holes still shows open seams at the bridge in the stats (they are hidden in the render).
+
 ## Step: Custom scalar field
 
 **Action:**

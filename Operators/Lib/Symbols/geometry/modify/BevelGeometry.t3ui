@@ -1,7 +1,7 @@
 {
   "FormatVersion": 3,
   "Id": "dbaeebea-8d46-416f-9624-867af10d9c07"/*BevelGeometry*/,
-  "Description": "Bevels the edges of a geometry: faces are inset, edges become rounded profile strips, vertices become corner patches.\n\nEdges between faces that meet at less than FlatAngle are skipped: those faces are merged into one polygon first and points on straight edges are dropped, which keeps the polygon count low on fractured or triangulated input without changing its look. Method decides how short edges and thin faces limit the width. Works on polygons; curve primitives pass through unchanged and come after all parts.\n\nAKA: chamfer, round edges, fillet",
+  "Description": "Bevels the edges of a geometry: faces are inset, edges become rounded profile strips, vertices become corner patches.\n\nEdgeSelection limits the bevel to the edges that bound a cap or to the edges between wall faces, using the IsSide face attribute written by [Extrude] and [ExtrudeCurves]; the other edges stay sharp. It uses the Fast method. Edges between faces that meet at less than FlatAngle are skipped: those faces are merged into one polygon first and points on straight edges are dropped, which keeps the polygon count low on fractured or triangulated input without changing its look. Method decides how short edges and thin faces limit the width. Works on polygons; curve primitives pass through unchanged and come after all parts.\n\nAKA: chamfer, round edges, fillet",
   "InputUis": [
     {
       "InputId": "091c932c-a7bb-487e-97c5-093e9838a700"/*Roundness*/,
@@ -10,6 +10,15 @@
         "Y": 135.0
       },
       "Description": "Blends the profile between a straight chamfer (0) and a circular arc (1)."
+    },
+    {
+      "InputId": "3ccbe233-5a23-46a1-b295-5ff44a3eb56b"/*EdgeSelection*/,
+      "Position": {
+        "X": 0.0,
+        "Y": 405.0
+      },
+      "Description": "Which edges get a bevel: All, the edges that bound a cap (including the rim to the wall), or the edges between wall faces. Needs the IsSide face attribute and the Fast method.",
+      "DisplayAs": "SegmentedSwitch"
     },
     {
       "InputId": "3f8b1c4d-92e6-4a17-b5d0-6a4c8e2f7d19"/*RoundCorners*/,

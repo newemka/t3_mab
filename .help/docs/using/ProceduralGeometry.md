@@ -37,6 +37,7 @@ Geometry becomes renderable through [GeometryToMesh], which triangulates the fac
 - **Roundness** — blends between a straight chamfer profile (`0`) and a circular arc (`1`).
 - **RoundCorners** — builds rounded patches at the corners instead of flat fans. Needs more than one segment.
 - **FlatShading** — by default bevels are smoothly shaded so the strips blend into the flat faces. Enable it for hard, faceted shading where every segment reads as its own plane.
+- **EdgeSelection** — bevels every edge (All), only the edges that bound a cap including its rim (CapEdges), or only the edges between wall faces (WallEdges). It reads the IsSide face attribute written by [Extrude] and [ExtrudeCurves] and uses the Fast method.
 
 Animating **Width** is cheap on simple shapes — the geometry rebuilds in real time.
 
