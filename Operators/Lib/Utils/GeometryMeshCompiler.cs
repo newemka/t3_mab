@@ -243,20 +243,21 @@ internal sealed class GeometryMeshCompiler
         _delaunayVertices.Clear();
         _delaunayEdges.Clear();
         _delaunayCornerOffsets.Clear();
-        _pointToDelaunay.Clear();
+        _projectedVertices.Clear();
 
         var cornerCount = end - start;
         var first = -1;
         var previous = -1;
         for (var corner = 0; corner < cornerCount; corner++)
         {
-            var point = source.VertexPoints[start + corner];
-            if (!_pointToDelaunay.TryGetValue(point, out var vertex))
+            // Dedupe by projected position, not point id: ops like the bevel create separate coincident
+            // points at a slit, which CDT rejects as duplicate vertices
+            var projected = Project(source, start + corner, axis);
+            if (!_projectedVertices.TryGetValue(projected, out var vertex))
             {
                 vertex = _delaunayVertices.Count;
-                _pointToDelaunay[point] = vertex;
+                _projectedVertices[projected] = vertex;
                 _delaunayCornerOffsets.Add(corner);
-                var projected = Project(source, start + corner, axis);
                 _delaunayVertices.Add(new V2d<double>(projected.X, projected.Y));
             }
 
@@ -437,7 +438,7 @@ internal sealed class GeometryMeshCompiler
     private readonly List<V2d<double>> _delaunayVertices = [];
     private readonly List<Edge> _delaunayEdges = [];
     private readonly List<int> _delaunayCornerOffsets = [];
-    private readonly Dictionary<int, int> _pointToDelaunay = [];
+    private readonly Dictionary<Vector2, int> _projectedVertices = [];
     private int[] _primitiveVertexStart = [];
     private int[] _primitiveTriangleStart = [];
     private int[] _primitiveToPart = [];

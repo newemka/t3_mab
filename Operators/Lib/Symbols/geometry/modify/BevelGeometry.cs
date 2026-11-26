@@ -9,10 +9,11 @@ namespace Lib.geometry.modify;
 /// <summary>
 /// Edge bevel for Geometry: every face is inset, every edge becomes a profile strip between its two
 /// inset faces, and every vertex becomes a patch closing the corner. Faces meeting at less than the
-/// flat angle are merged first, so flat edges get no strip.
+/// flat angle are merged first, so flat edges get no strip. Only the selected edges are inset and
+/// stripped; the others stay sharp.
 /// </summary>
 [Guid("dbaeebea-8d46-416f-9624-867af10d9c07")]
-internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
+internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider, IStatusProvider
 {
     private enum Methods
     {
@@ -20,8 +21,16 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         StraightSkeleton,
     }
 
+    /// <summary>Which edges get a bevel; caps and walls are told apart by the IsSide face attribute.</summary>
+    private enum EdgeSelections
+    {
+        All,
+        CapEdges,
+        WallEdges,
+    }
+
     private readonly record struct Settings(float Width, int Segments, float Roundness, bool FlatShading, bool RoundCorners,
-                                            Methods Method, float FlatAngle);
+                                            Methods Method, float FlatAngle, EdgeSelections EdgeSelection);
 
     [Output(Guid = "48342188-0139-4ea4-943d-a5b5d59b7a4a")]
     public readonly Slot<Geometry> Result = new();
@@ -35,13 +44,34 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
     {
         var original = Geometry.GetValue(context);
         var source = original != null ? _polygons.GetPolygons(original) : null;
+        var edgeSelection = (EdgeSelections)Math.Clamp(EdgeSelection.GetValue(context), 0, (int)EdgeSelections.WallEdges);
+        _statusMessage = string.Empty;
+
+        List<byte> faceKinds = null;
+        if (source != null && edgeSelection != EdgeSelections.All)
+        {
+            if (!TryCollectFaceKinds(source, out faceKinds))
+            {
+                _statusMessage = "No IsSide attribute; beveling all edges.";
+                edgeSelection = EdgeSelections.All;
+            }
+        }
+
+        var method = (Methods)Math.Clamp(Method.GetValue(context), 0, (int)Methods.StraightSkeleton);
+        if (method == Methods.StraightSkeleton && edgeSelection != EdgeSelections.All)
+        {
+            _statusMessage = "Edge selection uses the Fast method; beveling the selected edges with it.";
+            method = Methods.Fast;
+        }
+
         var settings = new Settings(Width.GetValue(context),
                                     Math.Clamp(Segments.GetValue(context), 1, 16),
                                     Math.Clamp(Roundness.GetValue(context), 0f, 1f),
                                     FlatShading.GetValue(context),
                                     RoundCorners.GetValue(context),
-                                    (Methods)Math.Clamp(Method.GetValue(context), 0, (int)Methods.StraightSkeleton),
-                                    Math.Clamp(FlatAngle.GetValue(context), 0f, 90f));
+                                    method,
+                                    Math.Clamp(FlatAngle.GetValue(context), 0f, 90f),
+                                    edgeSelection);
 
         if (source == null || source.PrimitiveCount == 0 || settings.Width <= 0)
         {
@@ -56,7 +86,7 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
                                                   token =>
                                                   {
                                                       var target = new Geometry();
-                                                      Build(target, source, settings, token);
+                                                      Build(target, source, settings, faceKinds, token);
                                                       return target;
                                                   });
             Result.Value = result != null ? _curves.Combine(result, original) : original;
@@ -64,16 +94,23 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         }
 
         _asyncComputation.WaitForPending(Result);
-        Build(_output, source, settings, CancellationToken.None);
+        Build(_output, source, settings, faceKinds, CancellationToken.None);
         Result.Value = _curves.Combine(_output, original);
     }
 
-    private void Build(Geometry target, Geometry source, Settings settings, CancellationToken token)
+    private void Build(Geometry target, Geometry source, Settings settings, List<byte> faceKinds, CancellationToken token)
     {
-        var mesh = settings.FlatAngle > 0 ? MergeFlatFaces(source, settings.FlatAngle) : source;
+        CollectBridgeEdges(source);
+        List<byte> mergedKinds = null;
+        var mesh = settings.FlatAngle > 0
+                       ? MergeFlatFaces(source, settings.FlatAngle, faceKinds, out mergedKinds)
+                       : source;
+        var edgeKinds = mesh == source ? faceKinds : mergedKinds;
+        _faceKinds = edgeKinds;
         var offsets = mesh.PrimitiveVertexOffsets;
         var edges = mesh.Edges;
         var segments = settings.Segments;
+        PrepareEdgeSelection(edges, settings.EdgeSelection, edgeKinds);
 
         _outPositions.Clear();
         _outNormals.Clear();
@@ -88,7 +125,7 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         if (_insetPointIds.Length != mesh.VertexCount)
             _insetPointIds = new int[mesh.VertexCount];
 
-        if (settings.Method == Methods.StraightSkeleton)
+        if (settings.Method == Methods.StraightSkeleton && AllInteriorEdgesBeveled(edges))
         {
             InsetBySkeleton(mesh, settings.Width, token);
         }
@@ -97,14 +134,25 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
             InsetFast(mesh, settings.Width);
         }
 
+        WeldSharpEdgeSeams(mesh, settings.Width);
+
         // --- B: inset faces (same winding as the source) --------------------
+        var cornerEdges = edges.CornerEdgeIndices;
         for (var faceIndex = 0; faceIndex < mesh.PrimitiveCount; faceIndex++)
         {
             var start = offsets[faceIndex];
             var end = offsets[faceIndex + 1];
             for (var c = start; c < end; c++)
             {
-                _polygon.Add(_insetPointIds[c]);
+                if (TryGetSplitCapCorner(mesh, faceIndex, c, cornerEdges, out var before, out var after))
+                {
+                    _polygon.Add(before);
+                    _polygon.Add(after);
+                }
+                else
+                {
+                    _polygon.Add(_insetPointIds[c]);
+                }
             }
 
             AddPolygon(_polygon);
@@ -123,8 +171,12 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
             if (edge.Face1 < 0)
                 continue; // boundary edge - nothing to connect
 
-            var ringA = BuildEndRing(mesh, edge, edge.PointA, segments, settings.Roundness, edgeRings, edgeIndex);
-            var ringB = BuildEndRing(mesh, edge, edge.PointB, segments, settings.Roundness, edgeRings, edgeIndex);
+            var beveled = _edgeBeveled[edgeIndex];
+            var ringA = BuildEndRing(mesh, edge, edge.PointA, segments, settings.Roundness, beveled, edgeRings, edgeIndex);
+            var ringB = BuildEndRing(mesh, edge, edge.PointB, segments, settings.Roundness, beveled, edgeRings, edgeIndex);
+            if (!beveled)
+                continue; // sharp edge: its flat rings only close the corner patches
+
             if (ringA == ringB)
                 continue; // the edge collapsed in both inset faces
 
@@ -168,13 +220,88 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         target.InvalidateTopologyCaches();
     }
 
+    /// <summary>Reads the IsSide face attribute into 1 for walls and 0 for caps; false when it is missing.</summary>
+    private static bool TryCollectFaceKinds(Geometry source, out List<byte> faceKinds)
+    {
+        faceKinds = null;
+        if (!source.Attributes.TryGet<float>(GeometryAttributeNames.IsSide, AttributeDomain.Primitive, out var isSide)
+            || isSide.Values.Length < source.PrimitiveCount)
+            return false;
+
+        faceKinds = new List<byte>(source.PrimitiveCount);
+        for (var faceIndex = 0; faceIndex < source.PrimitiveCount; faceIndex++)
+            faceKinds.Add(isSide.Values[faceIndex] != 0 ? (byte)1 : (byte)0);
+
+        return true;
+    }
+
+    /// <summary>Point pairs of the artificial bridge edges of [Extrude], which never get a bevel.</summary>
+    private void CollectBridgeEdges(Geometry source)
+    {
+        _bridgePointPairs.Clear();
+        if (!source.Attributes.TryGet<float>(GeometryAttributeNames.IsBridge, AttributeDomain.Edge, out var isBridge))
+            return;
+
+        var edges = source.Edges.Edges;
+        var count = Math.Min(edges.Length, isBridge.Values.Length);
+        for (var edgeIndex = 0; edgeIndex < count; edgeIndex++)
+        {
+            if (isBridge.Values[edgeIndex] != 0)
+                _bridgePointPairs.Add((edges[edgeIndex].PointA, edges[edgeIndex].PointB));
+        }
+    }
+
+    /// <summary>
+    /// Marks the edges that get a strip and drive the inset. Cap edges are those with at least one cap face
+    /// (including the rim between cap and wall), wall edges those between two wall faces.
+    /// </summary>
+    private void PrepareEdgeSelection(EdgeTopology topology, EdgeSelections selection, List<byte> faceKinds)
+    {
+        var edgeCount = topology.Edges.Length;
+        if (_edgeBeveled.Length < edgeCount)
+            _edgeBeveled = new bool[edgeCount];
+
+        for (var edgeIndex = 0; edgeIndex < edgeCount; edgeIndex++)
+        {
+            var edge = topology.Edges[edgeIndex];
+            var isBridge = IsBridgeEdge(edge);
+            if (selection == EdgeSelections.All)
+            {
+                _edgeBeveled[edgeIndex] = !isBridge;
+                continue;
+            }
+
+            var face0IsWall = faceKinds[edge.Face0] != 0;
+            var face1IsWall = edge.Face1 >= 0 ? faceKinds[edge.Face1] != 0 : face0IsWall;
+            _edgeBeveled[edgeIndex] = !isBridge && selection switch
+                                      {
+                                          EdgeSelections.CapEdges  => !(face0IsWall && face1IsWall),
+                                          EdgeSelections.WallEdges => face0IsWall && face1IsWall,
+                                          _                        => true,
+                                      };
+        }
+    }
+
+    private bool IsBridgeEdge(EdgeTopology.Edge edge)
+    {
+        foreach (var (a, b) in _bridgePointPairs)
+        {
+            if (a == edge.PointA && b == edge.PointB || a == edge.PointB && b == edge.PointA)
+                return true;
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Merges faces that meet at less than the flat angle into single polygons and drops points that only
     /// split a straight edge, so flat edges get no bevel strip. A region whose outline is not one simple
     /// convex loop (a hole, a pinched or concave corner) keeps its faces.
     /// </summary>
-    private Geometry MergeFlatFaces(Geometry source, float flatAngleDegrees)
+    private Geometry MergeFlatFaces(Geometry source, float flatAngleDegrees, List<byte> faceKinds, out List<byte> mergedKinds)
     {
+        mergedKinds = null;
+        _mergedFaceKinds.Clear();
         var faceCount = source.PrimitiveCount;
         var offsets = source.PrimitiveVertexOffsets;
         var cornerPoints = source.VertexPoints;
@@ -191,7 +318,9 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
 
         foreach (var edge in edges.Edges)
         {
-            if (edge.Face1 >= 0 && Vector3.Dot(_faceNormals[edge.Face0], _faceNormals[edge.Face1]) >= minCos)
+            if (edge.Face1 >= 0
+                && Vector3.Dot(_faceNormals[edge.Face0], _faceNormals[edge.Face1]) >= minCos
+                && (faceKinds == null || faceKinds[edge.Face0] == faceKinds[edge.Face1]))
                 Union(parent, edge.Face0, edge.Face1);
         }
 
@@ -236,6 +365,8 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
                     mergedCorners.AddRange(loop);
                     mergedOffsets.Add(mergedCorners.Count);
                     changed = true;
+                    if (faceKinds != null)
+                        _mergedFaceKinds.Add(faceKinds[faceIndex]);
                 }
             }
 
@@ -248,6 +379,8 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
             }
 
             mergedOffsets.Add(mergedCorners.Count);
+            if (faceKinds != null)
+                _mergedFaceKinds.Add(faceKinds[faceIndex]);
         }
 
         var merged = new Geometry
@@ -313,6 +446,7 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         merged.VertexPoints = reducedCorners.ToArray();
         merged.SetAllPrimitiveKinds(PrimitiveKinds.Polygon);
         merged.InvalidateTopologyCaches();
+        mergedKinds = faceKinds != null ? _mergedFaceKinds : null;
         return merged;
     }
 
@@ -517,9 +651,73 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         }
     }
 
+    /// <summary>
+    /// Shares the inset points of the two faces along a sharp edge when both land on the same spot, so the
+    /// seam closes instead of leaving two coincident open edges.
+    /// </summary>
+    private void WeldSharpEdgeSeams(Geometry mesh, float width)
+    {
+        var edges = mesh.Edges;
+        var toleranceSq = MathF.Max(width * 1e-3f, 1e-6f);
+        toleranceSq *= toleranceSq;
+
+        for (var edgeIndex = 0; edgeIndex < edges.Edges.Length; edgeIndex++)
+        {
+            var edge = edges.Edges[edgeIndex];
+            if (edge.Face1 < 0 || _edgeBeveled[edgeIndex])
+                continue;
+
+            WeldSeamEnd(mesh, edge, edge.PointA, toleranceSq);
+            WeldSeamEnd(mesh, edge, edge.PointB, toleranceSq);
+        }
+    }
+
+    private void WeldSeamEnd(Geometry mesh, EdgeTopology.Edge edge, int pointId, float toleranceSq)
+    {
+        var first = FindCornerInFace(mesh, edge.Face0, pointId);
+        var second = FindCornerInFace(mesh, edge.Face1, pointId);
+        var firstPoint = _insetPointIds[first];
+        var secondPoint = _insetPointIds[second];
+        if (firstPoint != secondPoint
+            && Vector3.DistanceSquared(_outPositions[firstPoint], _outPositions[secondPoint]) <= toleranceSq)
+            _insetPointIds[second] = firstPoint;
+    }
+
+    /// <summary>
+    /// A cap corner whose two edges stay sharp is cut back to the two wall inset corners where beveled wall
+    /// edges meet it, so the wall bevel ends flush against the cap instead of leaving the cap overhanging.
+    /// </summary>
+    private bool TryGetSplitCapCorner(Geometry mesh, int faceIndex, int corner, int[] cornerEdges, out int before, out int after)
+    {
+        before = after = -1;
+        if (_faceKinds == null || _faceKinds[faceIndex] != 0)
+            return false;
+
+        var start = mesh.PrimitiveVertexOffsets[faceIndex];
+        var end = mesh.PrimitiveVertexOffsets[faceIndex + 1];
+        var previousCorner = corner == start ? end - 1 : corner - 1;
+        var nextCorner = corner + 1 == end ? start : corner + 1;
+        var previousEdgeIndex = cornerEdges[previousCorner];
+        var nextEdgeIndex = cornerEdges[corner];
+        if (_edgeBeveled[previousEdgeIndex] || _edgeBeveled[nextEdgeIndex])
+            return false;
+
+        var previousEdge = mesh.Edges.Edges[previousEdgeIndex];
+        var nextEdge = mesh.Edges.Edges[nextEdgeIndex];
+        var previousNeighbor = previousEdge.Face0 == faceIndex ? previousEdge.Face1 : previousEdge.Face0;
+        var nextNeighbor = nextEdge.Face0 == faceIndex ? nextEdge.Face1 : nextEdge.Face0;
+        if (previousNeighbor < 0 || nextNeighbor < 0 || _faceKinds[previousNeighbor] == 0 || _faceKinds[nextNeighbor] == 0)
+            return false;
+
+        var pointId = mesh.VertexPoints[corner];
+        before = _insetPointIds[FindCornerInFace(mesh, previousNeighbor, pointId)];
+        after = _insetPointIds[FindCornerInFace(mesh, nextNeighbor, pointId)];
+        return before != after;
+    }
+
     /// <summary>Points along the bevel profile at one edge end, from Face0's inset point to Face1's.</summary>
     private int[] BuildEndRing(Geometry source, EdgeTopology.Edge edge, int endPointId,
-                               int segments, float roundness,
+                               int segments, float roundness, bool beveled,
                                Dictionary<(int, int), int[]> edgeRings, int edgeIndex)
     {
         var key = (edgeIndex, endPointId);
@@ -539,7 +737,7 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
 
         // A point with only two edges, both between the same two faces, gets no corner patch -
         // both edges must end in the same ring or a gap opens between them
-        var endsKey = (endPointId, Math.Min(q0Id, q1Id), Math.Max(q0Id, q1Id));
+        var endsKey = (endPointId, beveled, Math.Min(q0Id, q1Id), Math.Max(q0Id, q1Id));
         if (_ringsByEnds.TryGetValue(endsKey, out var sharedRing))
         {
             if (sharedRing[0] != q0Id)
@@ -554,6 +752,37 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
 
         var q0 = _outPositions[q0Id];
         var q1 = _outPositions[q1Id];
+        var n0 = _faceNormals[edge.Face0];
+        var n1 = _faceNormals[edge.Face1];
+
+        // A sharp edge keeps its two faces on the original line; the flat ring just closes their corner patches
+        if (!beveled)
+        {
+            var straightRing = new int[segments + 1];
+            for (var s = 0; s <= segments; s++)
+            {
+                if (s == 0)
+                {
+                    straightRing[s] = q0Id;
+                    continue;
+                }
+
+                if (s == segments)
+                {
+                    straightRing[s] = q1Id;
+                    continue;
+                }
+
+                var f = s / (float)segments;
+                var blendedNormal = Vector3.Lerp(n0, n1, f);
+                var normal = blendedNormal.LengthSquared() > 1e-10f ? Vector3.Normalize(blendedNormal) : n0;
+                straightRing[s] = q0Id == q1Id ? q0Id : AddPoint(Vector3.Lerp(q0, q1, f), normal);
+            }
+
+            edgeRings.Add(key, straightRing);
+            _ringsByEnds.Add(endsKey, straightRing);
+            return straightRing;
+        }
 
         // Control point: the original edge, inset along its own direction - the profile
         // bends around it. Projection of the midpoint onto the edge line.
@@ -564,8 +793,6 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         var t = edgeLengthSq > 1e-10f ? Vector3.Dot(mid - edgeStart, edgeDir) / edgeLengthSq : 0;
         var control = edgeStart + edgeDir * t;
 
-        var n0 = _faceNormals[edge.Face0];
-        var n1 = _faceNormals[edge.Face1];
         var ring = new int[segments + 1];
         ring[0] = q0Id;
         ring[segments] = q1Id;
@@ -622,6 +849,11 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
             if (adjacentEdges.Count < 3 || !TryWalkCornerLoop(source, edgeRings, pointId, adjacentEdges, segments, loop))
                 continue;
 
+            // A patch that lies flat in an adjacent face is already covered by that face; it only appears
+            // where a bevel ends on an edge that stays sharp, e.g. wall edges meeting a sharp cap rim.
+            if (IsCoplanarWithAdjacentFace(loop, adjacentEdges, source.Edges))
+                continue;
+
             OrientOutward(loop, positions[pointId]);
             var root = Find(clusterParent, pointId);
             (clusters.TryGetValue(root, out var members) ? members : clusters[root] = []).Add((loop.ToArray(), positions[pointId]));
@@ -652,6 +884,20 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
                 CloseCorner(loop, member.Vertex, segments, roundness, roundCorners);
             }
         }
+    }
+
+    private bool IsCoplanarWithAdjacentFace(List<int> loop, List<int> adjacentEdges, EdgeTopology topology)
+    {
+        var face = topology.Edges[adjacentEdges[0]].Face0;
+        var normal = _faceNormals[face];
+        var origin = _outPositions[loop[0]];
+        foreach (var id in loop)
+        {
+            if (MathF.Abs(Vector3.Dot(_outPositions[id] - origin, normal)) > 1e-5f)
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>Walks the fan of faces around a vertex and collects the ring points between them.</summary>
@@ -886,6 +1132,7 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
         var positions = mesh.Positions;
         var offsets = mesh.PrimitiveVertexOffsets;
         var cornerPoints = mesh.VertexPoints;
+        var cornerEdges = mesh.Edges.CornerEdgeIndices;
         if (_cornerVelocities.Length != mesh.VertexCount)
             _cornerVelocities = new Vector3[mesh.VertexCount];
 
@@ -896,13 +1143,38 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
             var end = offsets[faceIndex + 1];
             for (var c = start; c < end; c++)
             {
-                var previous = positions[cornerPoints[c == start ? end - 1 : c - 1]];
-                var next = positions[cornerPoints[c + 1 == end ? start : c + 1]];
+                var previousCorner = c == start ? end - 1 : c - 1;
+                var nextCorner = c + 1 == end ? start : c + 1;
+                var previous = positions[cornerPoints[previousCorner]];
+                var next = positions[cornerPoints[nextCorner]];
                 var p = positions[cornerPoints[c]];
-                _cornerVelocities[c] = StraightSkeletonInset.MiterVelocity(StraightSkeletonInset.EdgeInwardNormal(previous, p, faceNormal),
-                                                                          StraightSkeletonInset.EdgeInwardNormal(p, next, faceNormal));
+                var inwardPrevious = StraightSkeletonInset.EdgeInwardNormal(previous, p, faceNormal);
+                var inwardNext = StraightSkeletonInset.EdgeInwardNormal(p, next, faceNormal);
+                var previousBeveled = _edgeBeveled[cornerEdges[previousCorner]];
+                var nextBeveled = _edgeBeveled[cornerEdges[c]];
+
+                // A corner with one sharp edge slides along it instead of leaving it, so the sharp side stays put
+                _cornerVelocities[c] = previousBeveled
+                                           ? nextBeveled
+                                                 ? StraightSkeletonInset.MiterVelocity(inwardPrevious, inwardNext)
+                                                 : SlideVelocity(next - p, inwardPrevious)
+                                           : nextBeveled
+                                               ? SlideVelocity(previous - p, inwardNext)
+                                               : Vector3.Zero;
             }
         }
+    }
+
+    /** Moves along an unselected edge until the distance to the beveled edge, along its inward normal, is one. */
+    private static Vector3 SlideVelocity(Vector3 alongEdge, Vector3 inwardNormal)
+    {
+        var length = alongEdge.Length();
+        if (length < 1e-12f)
+            return Vector3.Zero;
+
+        var direction = alongEdge / length;
+        var denominator = Vector3.Dot(direction, inwardNormal);
+        return MathF.Abs(denominator) < 1e-5f ? Vector3.Zero : direction / denominator;
     }
 
     private static void ComputeFaceNormals(Geometry mesh, ref Vector3[] faceNormals)
@@ -1059,6 +1331,25 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
 
     public bool TryGetProgress(out float progress) => _asyncComputation.TryGetUiProgress(out progress);
 
+    public IStatusProvider.StatusLevel GetStatusLevel()
+    {
+        return string.IsNullOrEmpty(_statusMessage) ? IStatusProvider.StatusLevel.Success : IStatusProvider.StatusLevel.Warning;
+    }
+
+    public string GetStatusMessage() => _statusMessage;
+
+    /** The straight skeleton insets every edge; an edge left sharp would break its assumptions. */
+    private bool AllInteriorEdgesBeveled(EdgeTopology topology)
+    {
+        for (var edgeIndex = 0; edgeIndex < topology.Edges.Length; edgeIndex++)
+        {
+            if (topology.Edges[edgeIndex].Face1 >= 0 && !_edgeBeveled[edgeIndex])
+                return false;
+        }
+
+        return true;
+    }
+
     /** Fraction of an edge, or of the distance to another edge of the face, a corner may move across. */
     private const float MaxShareOfDistance = 0.45f;
 
@@ -1074,12 +1365,17 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
     private readonly List<int> _polygon = [];
     private readonly StraightSkeletonInset _skeleton = new();
     private readonly List<int> _cornerSlots = [];
-    private readonly Dictionary<(int PointId, int LowInsetId, int HighInsetId), int[]> _ringsByEnds = [];
+    private readonly Dictionary<(int PointId, bool Beveled, int LowInsetId, int HighInsetId), int[]> _ringsByEnds = [];
+    private readonly List<(int A, int B)> _bridgePointPairs = [];
+    private readonly List<byte> _mergedFaceKinds = [];
+    private List<byte> _faceKinds;
     private int[] _slotPointIds = new int[64];
     private int[] _insetPointIds = [];
+    private bool[] _edgeBeveled = [];
     private Vector3[] _faceNormals = [];
     private Vector3[] _cornerVelocities = [];
     private float[] _pointWidths = [];
+    private string _statusMessage = string.Empty;
 
     [Input(Guid = "46a2c9e2-7b5d-45ce-9955-b1c0b1bb01db")]
     public readonly InputSlot<Geometry> Geometry = new();
@@ -1092,6 +1388,9 @@ internal sealed class BevelGeometry : Instance<BevelGeometry>, IProgressProvider
 
     [Input(Guid = "88b2db34-b099-4fa6-8875-743dc40fd367")]
     public readonly InputSlot<float> FlatAngle = new();
+
+    [Input(Guid = "3ccbe233-5a23-46a1-b295-5ff44a3eb56b", MappedType = typeof(EdgeSelections))]
+    public readonly InputSlot<int> EdgeSelection = new();
 
     [Input(Guid = "e9085eac-dc15-4ecf-862d-869e66981418")]
     public readonly InputSlot<int> Segments = new();
